@@ -8,6 +8,10 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os
+import requests
 
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(
@@ -71,25 +75,11 @@ st.markdown("""
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white !important;
     }
-    .stDataFrame {
-        background: white !important;
-        border-radius: 15px !important;
-        border: 1px solid #e2e8f0 !important;
-        padding: 10px !important;
-    }
     .divider {
         background: linear-gradient(90deg, transparent, #667eea, #764ba2, transparent);
         height: 3px;
         margin: 30px 0;
         border-radius: 10px;
-    }
-    .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -160,7 +150,7 @@ GAMES_LIST = [
 
 PC_NUMBERS = list(range(7, 21))
 
-# --- ФУНКЦИИ ---
+# --- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ---
 def get_today():
     return date.today().isoformat()
 
@@ -334,150 +324,217 @@ def clear_day_data():
     conn.commit()
     conn.close()
 
-# --- PDF ---
+# --- PDF (РАБОЧАЯ ВЕРСИЯ С КИРИЛЛИЦЕЙ) ---
+def download_font():
+    """Скачиваем шрифт с поддержкой кириллицы"""
+    font_url = "https://github.com/ArtemkaKun/PDF-Report/raw/main/fonts/DejaVuSans.ttf"
+    font_path = "DejaVuSans.ttf"
+    
+    if not os.path.exists(font_path):
+        try:
+            response = requests.get(font_url)
+            with open(font_path, "wb") as f:
+                f.write(response.content)
+        except:
+            pass
+    return font_path
+
 def generate_pdf_report():
     today = get_today()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
     styles = getSampleStyleSheet()
-    style_title = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#667eea'))
-    style_header = ParagraphStyle('CustomHeader', parent=styles['Heading2'], fontSize=14, spaceAfter=10, textColor=colors.HexColor('#764ba2'))
-    style_normal = styles['Normal']
+    
+    # Пытаемся загрузить шрифт с кириллицей
+    font_name = 'Helvetica'
+    try:
+        font_path = download_font()
+        if os.path.exists(font_path):
+            pdfmetrics.registerFont(TTFont('DejaVu', font_path))
+            font_name = 'DejaVu'
+    except:
+        pass
+    
+    # Стили
+    style_title = ParagraphStyle(
+        'CustomTitle', 
+        parent=styles['Heading1'], 
+        fontSize=18, 
+        alignment=TA_CENTER, 
+        spaceAfter=20, 
+        textColor=colors.HexColor('#667eea'),
+        fontName=font_name
+    )
+    style_header = ParagraphStyle(
+        'CustomHeader', 
+        parent=styles['Heading2'], 
+        fontSize=14, 
+        spaceAfter=10, 
+        textColor=colors.HexColor('#764ba2'),
+        fontName=font_name
+    )
+    style_normal = ParagraphStyle(
+        'CustomNormal', 
+        parent=styles['Normal'],
+        fontName=font_name,
+        fontSize=10
+    )
     
     elements = []
     elements.append(Paragraph(f"Отчет по смене от {today}", style_title))
     elements.append(Spacer(1, 10))
     
-    # Фуди
+    # 1. Фуди
     elements.append(Paragraph("1. Продажи Фуд-корта", style_header))
     food_df = get_food_sales_today()
     if not food_df.empty:
         food_data = [["Товар", "Кол-во", "Цена", "Сумма"]]
         for _, row in food_df.iterrows():
-            food_data.append([row['product'], row['total_qty'], f"{row['price']:.0f} грн", f"{row['total_qty'] * row['price']:.0f} грн"])
+            food_data.append([
+                row['product'], 
+                str(row['total_qty']), 
+                f"{row['price']:.0f} грн", 
+                f"{row['total_qty'] * row['price']:.0f} грн"
+            ])
         food_data.append(["", "", "ИТОГО:", f"{get_food_total_today():.0f} грн"])
         table = Table(food_data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Продаж за сегодня нет", style_normal))
     elements.append(Spacer(1, 10))
     
-    # Бар
+    # 2. Бар
     elements.append(Paragraph("2. Продажи Бара", style_header))
     bar_df = get_bar_sales_today()
     if not bar_df.empty:
         bar_data = [["Товар", "Кол-во", "Цена", "Сумма"]]
         for _, row in bar_df.iterrows():
-            bar_data.append([row['product'], row['total_qty'], f"{row['price']:.0f} грн", f"{row['total_qty'] * row['price']:.0f} грн"])
+            bar_data.append([
+                row['product'], 
+                str(row['total_qty']), 
+                f"{row['price']:.0f} грн", 
+                f"{row['total_qty'] * row['price']:.0f} грн"
+            ])
         bar_data.append(["", "", "ИТОГО:", f"{get_bar_total_today():.0f} грн"])
         table = Table(bar_data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Продаж за сегодня нет", style_normal))
     elements.append(Spacer(1, 10))
     
-    # Остатки
+    # 3. Остатки Фуди
     elements.append(Paragraph("3. Остатки Фуд-корта", style_header))
     rem_df = get_food_remaining_today()
     if not rem_df.empty:
         rem_data = [["Товар", "Остаток"]]
         for _, row in rem_df.iterrows():
-            rem_data.append([row['product'], row['remaining']])
+            rem_data.append([row['product'], str(row['remaining'])])
         table = Table(rem_data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Остатки не введены", style_normal))
     elements.append(Spacer(1, 10))
     
-    # Бар остатки
+    # 4. Остатки Бара
     elements.append(Paragraph("4. Остатки Бара", style_header))
     bar_stock = get_bar_stock_today()
     if not bar_stock.empty:
         stock_data = [["Товар", "Начало", "Продано", "Остаток"]]
         for _, row in bar_stock.iterrows():
-            stock_data.append([row['product'], row['start_stock'], row['sold'], row['actual_stock']])
-        table = Table(stock_data, colWidths=[80, 50, 50, 50])
+            stock_data.append([
+                row['product'], 
+                str(row['start_stock']), 
+                str(row['sold']), 
+                str(row['actual_stock'])
+            ])
+        table = Table(stock_data, colWidths=[80, 45, 45, 45])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Остатки бара не введены", style_normal))
     elements.append(Spacer(1, 10))
     
-    # ПК
+    # 5. ПК
     elements.append(Paragraph("5. Состояние компьютеров", style_header))
     pc_df = get_pc_status_today()
     if not pc_df.empty:
-        pc_data = [["№ ПК", "Статус", "Заметка"]]
+        pc_data = [["N ПК", "Статус", "Заметка"]]
         for _, row in pc_df.iterrows():
-            pc_data.append([row['pc_number'], row['status'], row['note'] or "-"])
+            pc_data.append([str(row['pc_number']), row['status'], row['note'] or "-"])
         table = Table(pc_data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Статусы ПК не заполнены", style_normal))
     elements.append(Spacer(1, 10))
     
-    # Игры
+    # 6. Игры
     elements.append(Paragraph("6. Обновление игр", style_header))
     games_df = get_games_status()
     if not games_df.empty:
         games_data = [["Игра", "Обновлено", "Дата проверки"]]
         for _, row in games_df.iterrows():
-            status = "✅" if row['updated'] else "❌"
+            status = "Да" if row['updated'] else "Нет"
             games_data.append([row['name'], status, row['last_check'] or "-"])
         table = Table(games_data, colWidths=[120, 50, 80])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
         elements.append(Paragraph("Список игр не загружен", style_normal))
     elements.append(Spacer(1, 10))
     
-    # Финансы
+    # 7. Финансы
     elements.append(Paragraph("7. Финансовый итог смены", style_header))
     shift_df = get_shift_totals_today()
     if not shift_df.empty:
@@ -505,10 +562,11 @@ def generate_pdf_report():
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (-2, -2), (-1, -1), colors.HexColor('#48bb78'))
+            ('BACKGROUND', (-2, -2), (-1, -1), colors.HexColor('#48bb78')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
         total_accumulated = get_salary_accumulation()
@@ -522,11 +580,9 @@ def generate_pdf_report():
     return buffer
 
 # --- ИНТЕРФЕЙС ---
-
-# Шапка
 st.markdown("""
 <div style="text-align: center; padding: 30px 0 20px 0;">
-    <h1>🎮 КОМПЬЮТЕРНЫЙ КЛУБ</h1>
+    <h1>КОМПЬЮТЕРНЫЙ КЛУБ</h1>
     <p style="color: #4a5568; font-size: 18px; letter-spacing: 3px; margin-top: 5px;">
         УПРАВЛЕНИЕ СМЕНОЙ • ДАШБОРД
     </p>
@@ -536,7 +592,6 @@ st.markdown("""
 
 st.markdown(f"<p style='text-align: right; color: #718096;'>📅 {get_today()}</p>", unsafe_allow_html=True)
 
-# Накопления ЗП
 total_accumulated = get_salary_accumulation()
 st.markdown(f"""
 <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
@@ -545,41 +600,39 @@ st.markdown(f"""
             padding: 15px 25px;
             margin-bottom: 20px;
             text-align: center;">
-    <span style="color: #4a5568; font-size: 16px; font-weight: 600;">💰 НАКОПЛЕНИЯ К 9 ЧИСЛУ:</span>
+    <span style="color: #4a5568; font-size: 16px; font-weight: 600;">НАКОПЛЕНИЯ К 9 ЧИСЛУ:</span>
     <span style="color: #667eea; font-size: 30px; font-weight: 800; margin-left: 15px;">
         {total_accumulated:.0f} грн
     </span>
 </div>
 """, unsafe_allow_html=True)
 
-# Кнопка новой смены
 col_new1, col_new2, col_new3 = st.columns([1, 2, 1])
 with col_new2:
-    if st.button("🔄 НОВАЯ СМЕНА", use_container_width=True):
+    if st.button("НОВАЯ СМЕНА", use_container_width=True):
         clear_day_data()
-        st.success("✅ Данные за сегодня очищены! Можно начинать новую смену.")
+        st.success("Данные за сегодня очищены! Можно начинать новую смену.")
         st.rerun()
 
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
-# Вкладки
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "🏠 Главная", "🍔 Фуд-корт", "🍫 Бар", "🖥️ ПК", "🎮 Игры", "💰 Финансы", "📚 Архив"
+    "Главная", "Фуд-корт", "Бар", "ПК", "Игры", "Финансы", "Архив"
 ])
 
 # --- ГЛАВНАЯ ---
 with tab1:
-    st.markdown("<h2 style='text-align: center;'>📊 ДАШБОРД СМЕНЫ</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>ДАШБОРД СМЕНЫ</h2>", unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("🍔 Фуд-корт", f"{get_food_total_today():.0f} грн")
+        st.metric("Фуд-корт", f"{get_food_total_today():.0f} грн")
     with col2:
-        st.metric("🍫 Бар", f"{get_bar_total_today():.0f} грн")
+        st.metric("Бар", f"{get_bar_total_today():.0f} грн")
     with col3:
-        st.metric("💵 Общая выручка", f"{get_food_total_today() + get_bar_total_today():.0f} грн")
+        st.metric("Общая выручка", f"{get_food_total_today() + get_bar_total_today():.0f} грн")
     with col4:
-        st.metric("👤 Администратор", "Сегодня")
+        st.metric("Администратор", "Сегодня")
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
@@ -588,44 +641,42 @@ with tab1:
         row = shift_df.iloc[0]
         total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['food_total'] + row['bar_total']
         
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.subheader("📌 Итоги смены")
+        st.subheader("Итоги смены")
         col5, col6 = st.columns(2)
         with col5:
-            st.write(f"💳 Терминал: **{row['terminal']:.0f} грн**")
-            st.write(f"💵 Наличные: **{row['cash']:.0f} грн**")
-            st.write(f"🖥️ Аренда ПК: **{row['pc_rent']:.0f} грн**")
-            st.write(f"🖨️ Допы: **{row['extras']:.0f} грн**")
-            st.write(f"🍔 Фуд-корт: **{row['food_total']:.0f} грн**")
+            st.write(f"Терминал: **{row['terminal']:.0f} грн**")
+            st.write(f"Наличные: **{row['cash']:.0f} грн**")
+            st.write(f"Аренда ПК: **{row['pc_rent']:.0f} грн**")
+            st.write(f"Допы: **{row['extras']:.0f} грн**")
+            st.write(f"Фуд-корт: **{row['food_total']:.0f} грн**")
         with col6:
-            st.write(f"🍫 Бар: **{row['bar_total']:.0f} грн**")
-            st.write(f"💰 Общая касса: **{total_cash:.0f} грн**")
-            st.write(f"👤 Заработано: **{row['salary_today']:.0f} грн**")
-            st.write(f"💸 Забрал сейчас: **{row['cash_taken']:.0f} грн**")
-            st.write(f"🏦 Отложено: **{row['salary_to_account']:.0f} грн**")
-            st.write(f"💵 Остаток в кассе: **{row['remaining_cash']:.0f} грн**")
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.write(f"Бар: **{row['bar_total']:.0f} грн**")
+            st.write(f"Общая касса: **{total_cash:.0f} грн**")
+            st.write(f"Заработано: **{row['salary_today']:.0f} грн**")
+            st.write(f"Забрал сейчас: **{row['cash_taken']:.0f} грн**")
+            st.write(f"Отложено: **{row['salary_to_account']:.0f} грн**")
+            st.write(f"Остаток в кассе: **{row['remaining_cash']:.0f} грн**")
     else:
-        st.info("ℹ️ Смена еще не закрыта. Перейдите во вкладку 'Финансы' для закрытия смены.")
+        st.info("Смена еще не закрыта. Перейдите во вкладку 'Финансы' для закрытия смены.")
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
-    if st.button("📥 Скачать PDF-отчет за сегодня", use_container_width=True):
+    if st.button("Скачать PDF-отчет за сегодня", use_container_width=True):
         pdf_buffer = generate_pdf_report()
         st.download_button(
-            label="✅ Сохранить PDF",
+            label="Сохранить PDF",
             data=pdf_buffer,
-            file_name=f"отчет_{get_today()}.pdf",
+            file_name=f"otchet_{get_today()}.pdf",
             mime="application/pdf"
         )
 
 # --- ФУД-КОРТ ---
 with tab2:
-    st.header("🍔 Фуд-корт")
+    st.header("Фуд-корт")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("➕ Продажи")
+        st.subheader("Продажи")
         for product in FOOD_PRODUCTS:
             col_a, col_b = st.columns([3, 1])
             with col_a:
@@ -633,11 +684,11 @@ with tab2:
             with col_b:
                 if st.button(f"+1", key=f"food_{product}"):
                     add_food_sale(product)
-                    st.success(f"✅ {product} добавлен")
+                    st.success(f"{product} добавлен")
                     st.rerun()
     
     with col2:
-        st.subheader("📊 Продажи сегодня")
+        st.subheader("Продажи сегодня")
         df = get_food_sales_today()
         if not df.empty:
             df['Сумма'] = df['total_qty'] * df['price']
@@ -649,32 +700,31 @@ with tab2:
     
     st.divider()
     
-    # Инкассация
-    st.subheader("💰 Инкассация Фуди")
+    st.subheader("Инкассация Фуди")
     food_inc = st.number_input("Сумма инкассации (забрали из кассы Фуди)", min_value=0.0, step=50.0, format="%.0f", key="food_inc_input")
-    if st.button("✅ Сохранить инкассацию"):
+    if st.button("Сохранить инкассацию"):
         st.session_state['food_incassation'] = food_inc
         st.success(f"Инкассация сохранена: {food_inc:.0f} грн")
     
     st.divider()
     
-    st.subheader("📦 Остатки на конец дня")
+    st.subheader("Остатки на конец дня")
     rem_cols = st.columns(3)
     rem_values = {}
     for i, product in enumerate(FOOD_PRODUCTS.keys()):
         with rem_cols[i % 3]:
             rem_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"rem_{product}")
-    if st.button("💾 Сохранить остатки"):
+    if st.button("Сохранить остатки"):
         save_food_remaining(rem_values)
         st.success("Остатки сохранены!")
 
 # --- БАР ---
 with tab3:
-    st.header("🍫 Бар")
+    st.header("Бар")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("➕ Продажи")
+        st.subheader("Продажи")
         for product in BAR_PRODUCTS:
             col_a, col_b = st.columns([3, 1])
             with col_a:
@@ -682,11 +732,11 @@ with tab3:
             with col_b:
                 if st.button(f"+1", key=f"bar_{product}"):
                     add_bar_sale(product)
-                    st.success(f"✅ {product} добавлен")
+                    st.success(f"{product} добавлен")
                     st.rerun()
     
     with col2:
-        st.subheader("📊 Продажи сегодня")
+        st.subheader("Продажи сегодня")
         df = get_bar_sales_today()
         if not df.empty:
             df['Сумма'] = df['total_qty'] * df['price']
@@ -697,7 +747,7 @@ with tab3:
             st.info("Продаж пока нет")
     
     st.divider()
-    st.subheader("📦 Остатки бара")
+    st.subheader("Остатки бара")
     st.info("Введите начальные остатки (в начале смены) и фактические (в конце смены)")
     
     bar_stock_df = get_bar_stock_today()
@@ -710,7 +760,7 @@ with tab3:
             with start_cols[i % 3]:
                 start_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"start_{product}")
         
-        if st.button("✅ Сохранить начальные остатки"):
+        if st.button("Сохранить начальные остатки"):
             conn = sqlite3.connect('club_data.db')
             c = conn.cursor()
             today = get_today()
@@ -735,7 +785,7 @@ with tab3:
                 default_val = bar_stock_df[bar_stock_df['product'] == product]['actual_stock'].iloc[0] if not bar_stock_df[bar_stock_df['product'] == product].empty else 0
                 actual_values[product] = st.number_input(f"{product}", min_value=0, step=1, value=default_val, key=f"actual_{product}")
         
-        if st.button("💾 Сохранить фактические остатки"):
+        if st.button("Сохранить фактические остатки"):
             conn = sqlite3.connect('club_data.db')
             c = conn.cursor()
             today = get_today()
@@ -749,23 +799,23 @@ with tab3:
             st.success("Фактические остатки сохранены!")
             st.rerun()
         
-        st.subheader("🔍 Сверка остатков")
+        st.subheader("Сверка остатков")
         check_df = bar_stock_df.copy()
         check_df['Расхождение'] = check_df['start_stock'] - check_df['actual_stock']
         for idx, row in check_df.iterrows():
             if row['Расхождение'] != row['sold']:
-                check_df.loc[idx, 'Статус'] = '⚠️ Расхождение!'
+                check_df.loc[idx, 'Статус'] = 'Расхождение!'
             else:
-                check_df.loc[idx, 'Статус'] = '✅ Ок'
+                check_df.loc[idx, 'Статус'] = 'Ок'
         st.dataframe(check_df[['product', 'start_stock', 'actual_stock', 'sold', 'Статус']].rename(
             columns={'product': 'Товар', 'start_stock': 'Начало', 'actual_stock': 'Факт', 'sold': 'Продано'}))
 
 # --- ПК ---
 with tab4:
-    st.header("🖥️ Состояние компьютеров")
+    st.header("Состояние компьютеров")
     
     status_options = ["Работает отлично", "Проблема с наушниками", "Зависает", "Не включается", "Требуется перезагрузка", "Другое"]
-    new_status = st.text_input("➕ Добавить свой статус")
+    new_status = st.text_input("Добавить свой статус")
     if new_status and st.button("Добавить статус"):
         status_options.append(new_status)
         st.success(f"Статус '{new_status}' добавлен!")
@@ -775,23 +825,23 @@ with tab4:
     for i, pc in enumerate(PC_NUMBERS):
         with pc_cols[i % 5]:
             with st.container(border=True):
-                st.write(f"**ПК №{pc}**")
+                st.write(f"**ПК N{pc}**")
                 status = st.selectbox("Статус", status_options, key=f"status_{pc}")
                 note = st.text_area("Заметка", placeholder="Опишите проблему...", key=f"note_{pc}")
-                if st.button(f"Сохранить №{pc}", key=f"save_{pc}"):
+                if st.button(f"Сохранить N{pc}", key=f"save_{pc}"):
                     save_pc_status(pc, status, note)
-                    st.success(f"✅ ПК №{pc} сохранен")
+                    st.success(f"ПК N{pc} сохранен")
                     st.rerun()
     
     st.divider()
     pc_df = get_pc_status_today()
     if not pc_df.empty:
         st.dataframe(pc_df[['pc_number', 'status', 'note']].rename(
-            columns={'pc_number': '№ ПК', 'status': 'Статус', 'note': 'Заметка'}))
+            columns={'pc_number': 'N ПК', 'status': 'Статус', 'note': 'Заметка'}))
 
 # --- ИГРЫ ---
 with tab5:
-    st.header("🎮 Обновление игр")
+    st.header("Обновление игр")
     init_games()
     st.info("Отмечайте галочкой игры, которые обновлены и работают")
     
@@ -813,7 +863,7 @@ with tab5:
 
 # --- ФИНАНСЫ ---
 with tab6:
-    st.header("💰 Финансовый итог смены")
+    st.header("Финансовый итог смены")
     st.info("Заполните все суммы и нажмите 'Закрыть смену'")
     
     food_total = get_food_total_today()
@@ -822,14 +872,14 @@ with tab6:
     with st.form("shift_close"):
         col1, col2 = st.columns(2)
         with col1:
-            terminal = st.number_input("💳 Терминал (безнал)", min_value=0.0, step=50.0, format="%.0f")
-            cash = st.number_input("💵 Наличные", min_value=0.0, step=50.0, format="%.0f")
-            pc_rent = st.number_input("🖥️ Аренда ПК", min_value=0.0, step=50.0, format="%.0f")
+            terminal = st.number_input("Терминал (безнал)", min_value=0.0, step=50.0, format="%.0f")
+            cash = st.number_input("Наличные", min_value=0.0, step=50.0, format="%.0f")
+            pc_rent = st.number_input("Аренда ПК", min_value=0.0, step=50.0, format="%.0f")
         with col2:
-            extras = st.number_input("🖨️ Допы (печать и т.д.)", min_value=0.0, step=10.0, format="%.0f")
+            extras = st.number_input("Допы (печать и т.д.)", min_value=0.0, step=10.0, format="%.0f")
         
         food_inc = st.session_state.get('food_incassation', 0)
-        st.write(f"💰 Инкассация Фуди: **{food_inc:.0f} грн** (указана во вкладке Фуд-корт)")
+        st.write(f"Инкассация Фуди: **{food_inc:.0f} грн** (указана во вкладке Фуд-корт)")
         
         total_cash = terminal + cash + pc_rent + extras + food_total + bar_total
         
@@ -851,31 +901,31 @@ with tab6:
         st.divider()
         st.markdown(f"""
         <div style="background: rgba(102, 126, 234, 0.1); padding: 20px; border-radius: 15px; border: 1px solid rgba(102, 126, 234, 0.2);">
-            <h4>🧮 Расчет ЗП</h4>
-            <p>🍔 Фуд-корт: <b>{food_total:.0f} грн</b></p>
-            <p>🍫 Бар: <b>{bar_total:.0f} грн</b></p>
-            <p>💰 Общая касса: <b>{total_cash:.0f} грн</b></p>
-            <p>👤 Заработано за день: <b>{salary_today:.0f} грн</b> (ставка 400 + бонус)</p>
-            <p style="color: #48bb78;">💸 Забираю сейчас (наличкой): <b>{cash_taken:.0f} грн</b></p>
-            <p style="color: #ed8936;">🏦 Откладывается к 9 числу: <b>{salary_to_account:.0f} грн</b></p>
-            <p style="color: #e53e3e;">💰 Инкассация Фуди: <b>-{food_inc:.0f} грн</b></p>
-            <p>💵 Остаток в кассе: <b>{remaining_cash:.0f} грн</b></p>
+            <h4>Расчет ЗП</h4>
+            <p>Фуд-корт: <b>{food_total:.0f} грн</b></p>
+            <p>Бар: <b>{bar_total:.0f} грн</b></p>
+            <p>Общая касса: <b>{total_cash:.0f} грн</b></p>
+            <p>Заработано за день: <b>{salary_today:.0f} грн</b> (ставка 400 + бонус)</p>
+            <p style="color: #48bb78;">Забираю сейчас (наличкой): <b>{cash_taken:.0f} грн</b></p>
+            <p style="color: #ed8936;">Откладывается к 9 числу: <b>{salary_to_account:.0f} грн</b></p>
+            <p style="color: #e53e3e;">Инкассация Фуди: <b>-{food_inc:.0f} грн</b></p>
+            <p>Остаток в кассе: <b>{remaining_cash:.0f} грн</b></p>
         </div>
         """, unsafe_allow_html=True)
         
-        if st.form_submit_button("✅ Закрыть смену"):
+        if st.form_submit_button("Закрыть смену"):
             if total_cash > 0:
                 if salary_to_account > 0:
                     add_salary_accumulation(salary_to_account)
                 save_shift_totals(terminal, cash, pc_rent, extras, food_total, bar_total, food_inc, salary_today, salary_to_account, cash_taken, remaining_cash)
-                st.success(f"✅ Смена закрыта! Заработано: {salary_today:.0f} грн, Забрал: {cash_taken:.0f} грн, Отложено: {salary_to_account:.0f} грн, Остаток: {remaining_cash:.0f} грн")
+                st.success(f"Смена закрыта! Заработано: {salary_today:.0f} грн, Забрал: {cash_taken:.0f} грн, Отложено: {salary_to_account:.0f} грн, Остаток: {remaining_cash:.0f} грн")
                 st.balloons()
             else:
                 st.error("Ошибка: общая касса не может быть 0")
 
 # --- АРХИВ ---
 with tab7:
-    st.header("📚 Архив смен")
+    st.header("Архив смен")
     
     all_shifts = get_all_shifts()
     if not all_shifts.empty:
@@ -907,10 +957,10 @@ with tab7:
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("📊 Общая выручка за все дни", f"{total_all:.0f} грн")
+            st.metric("Общая выручка за все дни", f"{total_all:.0f} грн")
         with col2:
-            st.metric("🏦 Всего отложено к 9 числу", f"{total_accum:.0f} грн")
+            st.metric("Всего отложено к 9 числу", f"{total_accum:.0f} грн")
         with col3:
-            st.metric("📅 Всего смен", f"{len(all_shifts)}")
+            st.metric("Всего смен", f"{len(all_shifts)}")
     else:
         st.info("Архив пока пуст. Закройте первую смену!")
