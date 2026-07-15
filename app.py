@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime, date
+import base64
 
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(
@@ -15,10 +16,8 @@ st.markdown("""
 <style>
     .stApp {
         background: linear-gradient(135deg, #ffe6f0 0%, #ffd6e8 50%, #fce4ec 100%);
-        font-family: 'Quicksand', sans-serif;
     }
     h1 {
-        font-family: 'Quicksand', sans-serif !important;
         background: linear-gradient(90deg, #f78da7, #d4a5f5);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -27,7 +26,6 @@ st.markdown("""
         text-align: center;
     }
     h2, h3, h4 {
-        font-family: 'Quicksand', sans-serif !important;
         color: #6b4c6b !important;
         font-weight: 600 !important;
     }
@@ -38,7 +36,6 @@ st.markdown("""
         border-radius: 50px !important;
         padding: 12px 30px !important;
         font-weight: 600 !important;
-        font-family: 'Quicksand', sans-serif !important;
         box-shadow: 0 4px 15px rgba(247, 141, 167, 0.4) !important;
         transition: all 0.3s ease !important;
     }
@@ -52,12 +49,10 @@ st.markdown("""
         border-radius: 20px !important;
         padding: 15px !important;
         border: 2px solid rgba(247, 141, 167, 0.2) !important;
-        box-shadow: 0 4px 20px rgba(247, 141, 167, 0.1) !important;
     }
     .stMetric label {
         color: #6b4c6b !important;
         font-weight: 600 !important;
-        font-family: 'Quicksand', sans-serif !important;
     }
     .stMetric .stMetricValue {
         color: #4a2d4a !important;
@@ -76,7 +71,6 @@ st.markdown("""
         padding: 10px 25px;
         color: #6b4c6b !important;
         font-weight: 500;
-        font-family: 'Quicksand', sans-serif !important;
         transition: all 0.3s ease;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
@@ -387,9 +381,13 @@ def get_games_status():
 # ===== ЗП =====
 def get_salary_accumulation():
     conn = sqlite3.connect('club_data.db')
-    df = pd.read_sql_query("SELECT SUM(amount) as total FROM salary_accumulation", conn)
+    c = conn.cursor()
+    c.execute("SELECT SUM(amount) as total FROM salary_accumulation")
+    result = c.fetchone()
     conn.close()
-    return df['total'][0] if not df.empty and df['total'][0] else 0
+    if result and result[0] is not None:
+        return float(result[0])
+    return 0.0
 
 def add_salary_accumulation(amount):
     conn = sqlite3.connect('club_data.db')
@@ -421,6 +419,7 @@ def get_all_shifts():
     conn.close()
     return df
 
+# ===== ОЧИСТКА ДАННЫХ =====
 def clear_shift_data():
     """Очистка только текущей смены"""
     today = get_today()
@@ -438,28 +437,33 @@ def clear_shift_data():
     c.execute("DELETE FROM daily_notes WHERE date=?", (today,))
     conn.commit()
     conn.close()
+    st.cache_data.clear()
 
 def clear_all_data():
     """Полная очистка всех данных (обнуление месяца)"""
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     
-    # Удаляем все данные из таблиц
-    tables = [
-        "sales_fudi", "fudi_remaining", "fudi_arrival", "fudi_incassation",
-        "sales_bar", "bar_stock", "bar_arrival", "bar_products",
-        "pc_status", "shift_totals", "salary_accumulation", 
-        "games", "daily_notes"
-    ]
+    c.execute("DELETE FROM sales_fudi")
+    c.execute("DELETE FROM fudi_remaining")
+    c.execute("DELETE FROM fudi_arrival")
+    c.execute("DELETE FROM fudi_incassation")
+    c.execute("DELETE FROM sales_bar")
+    c.execute("DELETE FROM bar_stock")
+    c.execute("DELETE FROM bar_arrival")
+    c.execute("DELETE FROM bar_products")
+    c.execute("DELETE FROM pc_status")
+    c.execute("DELETE FROM shift_totals")
+    c.execute("DELETE FROM salary_accumulation")
+    c.execute("DELETE FROM games")
+    c.execute("DELETE FROM daily_notes")
     
-    for table in tables:
-        c.execute(f"DELETE FROM {table}")
-    
-    # Сбрасываем автоинкремент
     c.execute("DELETE FROM sqlite_sequence")
     
     conn.commit()
     conn.close()
+    st.cache_data.clear()
+
 # ===== РАСЧЕТ БОНУСА =====
 def calculate_bonus(total_cash_without_fudi):
     """Расчет бонуса: если >= 1200 +100, потом за каждые 1000 +100"""
@@ -769,22 +773,35 @@ with tab1:
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
+    # Получаем заметки для отчета
     notes_df = get_notes_today()
     notes_text = ""
     if not notes_df.empty:
         notes_text = "\n".join([f"{row['timestamp']} - {row['note']}" for _, row in notes_df.iterrows()])
     
-    if st.button("📄 Открыть отчет в браузере", use_container_width=True):
+    # КНОПКА ДЛЯ ОТКРЫТИЯ ОТЧЕТА В НОВОЙ ВКЛАДКЕ
+    if st.button("📄 Открыть отчет в новой вкладке", use_container_width=True):
         html_report = generate_html_report(notes_text)
-        st.markdown(f"""
+        b64 = base64.b64encode(html_report.encode()).decode()
+        href = f'data:text/html;base64,{b64}'
+        st.markdown(f'''
         <div style="text-align: center; padding: 20px; background: #f3e5f5; border-radius: 20px; border: 2px solid #d4a5f5;">
             <p style="font-size: 18px; color: #6b4c6b;">🐱 Отчет готов!</p>
-            <p style="color: #b39ddb;">Нажмите <strong>Ctrl+P</strong> (или Cmd+P на Mac) и выберите <strong>"Сохранить как PDF"</strong></p>
-            <div style="border: 2px solid #fce4ec; border-radius: 15px; padding: 20px; margin-top: 15px; background: white; text-align: left; max-height: 500px; overflow: auto;">
-                {html_report}
-            </div>
+            <a href="{href}" target="_blank" style="
+                background: linear-gradient(135deg, #f78da7, #d4a5f5);
+                color: white;
+                padding: 12px 40px;
+                border-radius: 50px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 16px;
+                display: inline-block;
+                margin: 10px 0;
+                box-shadow: 0 4px 15px rgba(247, 141, 167, 0.4);
+            ">📄 ОТКРЫТЬ ОТЧЕТ В НОВОЙ ВКЛАДКЕ</a>
+            <p style="color: #b39ddb; font-size: 14px;">После открытия нажмите <strong>Ctrl+P</strong> и выберите <strong>"Сохранить как PDF"</strong></p>
         </div>
-        """, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
 
 # ===== ФУДИ =====
 with tab2:
