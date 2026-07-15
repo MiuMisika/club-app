@@ -10,16 +10,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CSS (МИЛЫЙ ДИЗАЙН С КОТИКАМИ) ---
+# --- CSS (МИЛЫЙ ДИЗАЙН) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
-    
     .stApp {
         background: linear-gradient(135deg, #ffe6f0 0%, #ffd6e8 50%, #fce4ec 100%);
         font-family: 'Quicksand', sans-serif;
     }
-    
     h1 {
         font-family: 'Quicksand', sans-serif !important;
         background: linear-gradient(90deg, #f78da7, #d4a5f5);
@@ -29,13 +26,11 @@ st.markdown("""
         font-size: 42px !important;
         text-align: center;
     }
-    
     h2, h3, h4 {
         font-family: 'Quicksand', sans-serif !important;
         color: #6b4c6b !important;
         font-weight: 600 !important;
     }
-    
     .stButton > button {
         background: linear-gradient(135deg, #f78da7, #d4a5f5) !important;
         color: white !important;
@@ -47,12 +42,10 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(247, 141, 167, 0.4) !important;
         transition: all 0.3s ease !important;
     }
-    
     .stButton > button:hover {
         transform: translateY(-3px) scale(1.02) !important;
         box-shadow: 0 8px 30px rgba(212, 165, 245, 0.5) !important;
     }
-    
     .stMetric {
         background: rgba(255, 255, 255, 0.7) !important;
         backdrop-filter: blur(10px) !important;
@@ -61,19 +54,16 @@ st.markdown("""
         border: 2px solid rgba(247, 141, 167, 0.2) !important;
         box-shadow: 0 4px 20px rgba(247, 141, 167, 0.1) !important;
     }
-    
     .stMetric label {
         color: #6b4c6b !important;
         font-weight: 600 !important;
         font-family: 'Quicksand', sans-serif !important;
     }
-    
     .stMetric .stMetricValue {
         color: #4a2d4a !important;
         font-weight: 700 !important;
         font-size: 28px !important;
     }
-    
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background: rgba(255, 255, 255, 0.5);
@@ -81,7 +71,6 @@ st.markdown("""
         padding: 5px;
         backdrop-filter: blur(10px);
     }
-    
     .stTabs [data-baseweb="tab"] {
         border-radius: 50px;
         padding: 10px 25px;
@@ -90,73 +79,16 @@ st.markdown("""
         font-family: 'Quicksand', sans-serif !important;
         transition: all 0.3s ease;
     }
-    
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         background: linear-gradient(135deg, #f78da7, #d4a5f5);
         color: white !important;
         border-radius: 50px;
     }
-    
     .divider {
         background: linear-gradient(90deg, transparent, #f78da7, #d4a5f5, transparent);
         height: 3px;
         margin: 30px 0;
         border-radius: 10px;
-    }
-    
-    .glass-card {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 8px 32px rgba(247, 141, 167, 0.1);
-        border: 2px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    .cat-icon {
-        font-size: 24px;
-        display: inline-block;
-        animation: bounce 2s infinite;
-    }
-    
-    @keyframes bounce {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-    }
-    
-    /* Стили для текстовых полей */
-    .stTextInput input, .stNumberInput input, .stTextArea textarea {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 2px solid rgba(247, 141, 167, 0.3) !important;
-        border-radius: 15px !important;
-        color: #4a2d4a !important;
-        font-family: 'Quicksand', sans-serif !important;
-    }
-    
-    .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
-        border-color: #d4a5f5 !important;
-        box-shadow: 0 0 0 3px rgba(212, 165, 245, 0.2) !important;
-    }
-    
-    /* Чекбоксы */
-    .stCheckbox label {
-        color: #4a2d4a !important;
-        font-weight: 500 !important;
-        font-family: 'Quicksand', sans-serif !important;
-    }
-    
-    /* Датафреймы */
-    .stDataFrame {
-        background: rgba(255, 255, 255, 0.7) !important;
-        border-radius: 15px !important;
-        border: 2px solid rgba(247, 141, 167, 0.2) !important;
-        padding: 10px !important;
-    }
-    
-    /* Инфо блоки */
-    .stAlert, .stInfo, .stSuccess, .stWarning {
-        border-radius: 15px !important;
-        font-family: 'Quicksand', sans-serif !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -166,57 +98,46 @@ def init_db():
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     
-    # Фуди - продажи
     c.execute('''CREATE TABLE IF NOT EXISTS sales_fudi
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
     
-    # Фуди - остатки
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_remaining
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, remaining INTEGER)''')
     
-    # Фуди - приход товара
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_arrival
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER)''')
     
-    # Фуди - инкассация
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_incassation
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, amount REAL)''')
     
-    # Бар - продажи
     c.execute('''CREATE TABLE IF NOT EXISTS sales_bar
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
     
-    # Бар - остатки
     c.execute('''CREATE TABLE IF NOT EXISTS bar_stock
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, start_stock INTEGER, actual_stock INTEGER, sold INTEGER)''')
     
-    # Бар - приход товара
     c.execute('''CREATE TABLE IF NOT EXISTS bar_arrival
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER)''')
     
-    # Бар - список товаров
     c.execute('''CREATE TABLE IF NOT EXISTS bar_products
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   name TEXT UNIQUE, price REAL)''')
     
-    # ПК
     c.execute('''CREATE TABLE IF NOT EXISTS pc_status
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, pc_number INTEGER, status TEXT, note TEXT)''')
     
-    # Игры
     c.execute('''CREATE TABLE IF NOT EXISTS games
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   name TEXT UNIQUE, updated BOOLEAN, last_check TEXT)''')
     
-    # Итоги смены (с колонкой notes)
     c.execute('''DROP TABLE IF EXISTS shift_totals''')
     c.execute('''CREATE TABLE shift_totals
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,16 +147,47 @@ def init_db():
                   salary_today REAL, salary_to_account REAL, 
                   cash_taken REAL, remaining_cash REAL, notes TEXT)''')
     
-    # Накопления ЗП
     c.execute('''CREATE TABLE IF NOT EXISTS salary_accumulation
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, amount REAL, total_accumulated REAL)''')
     
-    # Заметки
     c.execute('''CREATE TABLE IF NOT EXISTS daily_notes
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, note TEXT, timestamp TEXT)''')
     
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- СПИСКИ ---
+FUDI_PRODUCTS = {
+    "Бургер": 80, "Картошка фри": 80, "Нагетсы": 80,
+    "Мини-чебуречки": 80, "Хот-дог 2х": 80,
+    "Хот-дог": 75, "Соус": 10
+}
+
+GAMES_LIST = [
+    "League of Legends", "Legends of Runeterra", "Dota 2", "CS2",
+    "Dota Underlords", "Apex Legends", "PUBG: BATTLEGROUNDS",
+    "Arena Breakout: Infinite", "Roblox", "Minecraft",
+    "World of Tanks", "World of Warships", "Hearthstone",
+    "World of Warcraft / WoW Classic", "Fortnite", "War Thunder",
+    "Warcraft III: The Frozen Throne / ICCup Launcher"
+]
+
+PC_NUMBERS = list(range(7, 21))
+
+# --- ФУНКЦИИ ---
+def get_today():
+    return date.today().isoformat()
+
+# ===== ЗАМЕТКИ =====
+def add_note(note):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO daily_notes (date, note, timestamp) VALUES (?, ?, ?)",
+              (get_today(), note, datetime.now().strftime("%H:%M")))
     conn.commit()
     conn.close()
 
@@ -469,7 +421,8 @@ def get_all_shifts():
     conn.close()
     return df
 
-def clear_day_data():
+def clear_shift_data():
+    """Очистка только текущей смены"""
     today = get_today()
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
@@ -487,11 +440,9 @@ def clear_day_data():
     conn.close()
 
 def clear_all_data():
-    """Полная очистка всех данных (обнуление месяца)"""
+    """Полная очистка всех данных"""
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    
-    # Очищаем все таблицы
     c.execute("DELETE FROM sales_fudi")
     c.execute("DELETE FROM fudi_remaining")
     c.execute("DELETE FROM fudi_arrival")
@@ -505,31 +456,21 @@ def clear_all_data():
     c.execute("DELETE FROM salary_accumulation")
     c.execute("DELETE FROM games")
     c.execute("DELETE FROM daily_notes")
-    
-    # Сбрасываем автоинкремент
     c.execute("DELETE FROM sqlite_sequence")
-    
     conn.commit()
     conn.close()
-def clear_shift_data():
-    """Очистка только текущей смены (данные за сегодня)"""
-    today = get_today()
-    conn = sqlite3.connect('club_data.db')
-    c = conn.cursor()
-    
-    c.execute("DELETE FROM sales_fudi WHERE date=?", (today,))
-    c.execute("DELETE FROM fudi_remaining WHERE date=?", (today,))
-    c.execute("DELETE FROM fudi_arrival WHERE date=?", (today,))
-    c.execute("DELETE FROM fudi_incassation WHERE date=?", (today,))
-    c.execute("DELETE FROM sales_bar WHERE date=?", (today,))
-    c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
-    c.execute("DELETE FROM bar_arrival WHERE date=?", (today,))
-    c.execute("DELETE FROM pc_status WHERE date=?", (today,))
-    c.execute("DELETE FROM shift_totals WHERE date=?", (today,))
-    c.execute("DELETE FROM daily_notes WHERE date=?", (today,))
-    
-    conn.commit()
-    conn.close()
+
+# ===== РАСЧЕТ БОНУСА =====
+def calculate_bonus(total_cash_without_fudi):
+    """Расчет бонуса: если >= 1200 +100, потом за каждые 1000 +100"""
+    if total_cash_without_fudi >= 1200:
+        bonus = 100
+        extra = total_cash_without_fudi - 1200
+        if extra >= 1000:
+            bonus += (int(extra // 1000)) * 100
+        return bonus
+    return 0
+
 # ===== HTML ОТЧЕТ =====
 def generate_html_report(notes_text=""):
     today = get_today()
@@ -561,7 +502,7 @@ def generate_html_report(notes_text=""):
             h1 {{ text-align: center; color: #f78da7; font-size: 28px; border-bottom: 3px solid #f78da7; padding-bottom: 15px; }}
             h2 {{ color: #d4a5f5; font-size: 20px; margin-top: 30px; border-left: 4px solid #d4a5f5; padding-left: 15px; }}
             table {{ width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }}
-            th {{ background: #f78da7; color: white; padding: 10px; text-align: center; border-radius: 10px; }}
+            th {{ background: #f78da7; color: white; padding: 10px; text-align: center; }}
             td {{ padding: 8px 10px; border-bottom: 1px solid #fce4ec; text-align: center; }}
             tr:hover {{ background: #fce4ec; }}
             .total-row {{ background: #f3e5f5; font-weight: bold; }}
@@ -575,14 +516,6 @@ def generate_html_report(notes_text=""):
             .value-red {{ color: #ef5350; }}
             .value-blue {{ color: #7e57c2; }}
             .notes-box {{ background: #fce4ec; border-radius: 15px; padding: 20px; margin-top: 20px; border: 2px dashed #f78da7; }}
-            .cat {{
-                display: inline-block;
-                animation: bounce 2s infinite;
-            }}
-            @keyframes bounce {{
-                0%, 100% {{ transform: translateY(0); }}
-                50% {{ transform: translateY(-5px); }}
-            }}
         </style>
     </head>
     <body>
@@ -591,7 +524,7 @@ def generate_html_report(notes_text=""):
             <p style="text-align: center; color: #b39ddb;">Дата: <strong>{today}</strong></p>
     """
     
-    # ===== ФУДИ =====
+    # ФУДИ
     html += f"<h2>🍣 1. Фуди - продажи</h2>"
     if not fudi_df.empty:
         html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
@@ -601,7 +534,6 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Продаж за сегодня нет</p>"
     
-    # Фуди - приход
     html += f"<h2>📦 Фуди - приход товара</h2>"
     if not fudi_arrivals.empty:
         html += """<table><tr><th>Товар</th><th>Количество</th></tr>"""
@@ -611,7 +543,6 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Прихода за сегодня нет</p>"
     
-    # Фуди - инкассация
     html += f"<h2>💰 Фуди - инкассация</h2>"
     html += f"<p>Всего инкассировано: <strong>{fudi_inc:.0f} грн</strong></p>"
     fudi_debt = fudi_total - fudi_inc
@@ -620,7 +551,6 @@ def generate_html_report(notes_text=""):
     else:
         html += f"<p>Остаток в кассе Фуди: <strong>0 грн</strong></p>"
     
-    # Фуди - остатки
     html += f"<h2>📊 Фуди - остатки на конец дня</h2>"
     if not rem_df.empty:
         html += """<table><tr><th>Товар</th><th>Остаток</th></tr>"""
@@ -630,7 +560,7 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Остатки не введены</p>"
     
-    # ===== БАР =====
+    # БАР
     html += f"<h2>🧋 2. Бар - продажи</h2>"
     if not bar_df.empty:
         html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
@@ -640,7 +570,6 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Продаж за сегодня нет</p>"
     
-    # Бар - приход
     html += f"<h2>📦 Бар - приход товара</h2>"
     if not bar_arrivals.empty:
         html += """<table><tr><th>Товар</th><th>Количество</th></tr>"""
@@ -650,7 +579,6 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Прихода за сегодня нет</p>"
     
-    # Бар - остатки
     html += f"<h2>📊 Бар - остатки</h2>"
     if not bar_stock.empty:
         html += """<table><tr><th>Товар</th><th>Начало</th><th>Продано</th><th>Остаток</th></tr>"""
@@ -660,7 +588,7 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Остатки бара не введены</p>"
     
-    # ===== ПК =====
+    # ПК
     html += f"<h2>💻 3. Состояние компьютеров</h2>"
     if not pc_df.empty:
         html += """<table><tr><th>N ПК</th><th>Статус</th><th>Заметка</th></tr>"""
@@ -670,7 +598,7 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Статусы ПК не заполнены</p>"
     
-    # ===== ИГРЫ =====
+    # ИГРЫ
     html += f"<h2>🎮 4. Обновление игр</h2>"
     if not games_df.empty:
         html += """<table><tr><th>Игра</th><th>Обновлено</th><th>Дата проверки</th></tr>"""
@@ -682,27 +610,27 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Список игр не загружен</p>"
     
-    # ===== ФИНАНСЫ =====
+    # ФИНАНСЫ
     html += f"<h2>💰 5. Финансовый итог смены</h2>"
     if not shift_df.empty:
         row = shift_df.iloc[0]
         total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['fudi_total'] + row['bar_total']
         html += f"""
         <div class="summary">
-            <div class="summary-row"><span class="label">💳 Терминал (безнал):</span><span class="value">{row['terminal']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">💳 Терминал:</span><span class="value">{row['terminal']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">💵 Наличные:</span><span class="value">{row['cash']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">🖥️ Аренда ПК:</span><span class="value">{row['pc_rent']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">🖨️ Допы:</span><span class="value">{row['extras']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">🍣 Фуди:</span><span class="value">{row['fudi_total']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">🧋 Бар:</span><span class="value">{row['bar_total']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">💰 Инкассация Фуди:</span><span class="value value-red">-{row['incassation_total']:.0f} грн</span></div>
-            <div class="summary-row"><span class="label">🐱 Долг Елены (остаток в Фуди):</span><span class="value value-orange">{row['fudi_debt']:.0f} грн</span></div>
-            <hr style="border: 1px solid #fce4ec; margin: 15px 0;">
+            <div class="summary-row"><span class="label">🐱 Долг Елены:</span><span class="value value-orange">{row['fudi_debt']:.0f} грн</span></div>
+            <hr>
             <div class="summary-row"><span class="label" style="font-size: 18px;">📊 ОБЩАЯ КАССА:</span><span class="value" style="font-size: 18px; color: #7e57c2;">{total_cash:.0f} грн</span></div>
-            <div class="summary-row"><span class="label">👩‍💼 Заработано за день:</span><span class="value value-blue">{row['salary_today']:.0f} грн</span></div>
-            <div class="summary-row"><span class="label">💸 Забрал сейчас (наличкой):</span><span class="value value-green">{row['cash_taken']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">👩‍💼 Заработано:</span><span class="value value-blue">{row['salary_today']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">💸 Забрал сейчас:</span><span class="value value-green">{row['cash_taken']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">🏦 Отложено к 9 числу:</span><span class="value value-orange">{row['salary_to_account']:.0f} грн</span></div>
-            <hr style="border: 1px solid #fce4ec; margin: 15px 0;">
+            <hr>
             <div class="summary-row"><span class="label" style="font-size: 18px;">💎 ИТОГОВЫЙ ОСТАТОК:</span><span class="value" style="font-size: 18px; color: #66bb6a;">{row['remaining_cash']:.0f} грн</span></div>
         </div>
         """
@@ -715,7 +643,7 @@ def generate_html_report(notes_text=""):
     else:
         html += "<p style='color: #b39ddb;'>Финансовый итог не подведен</p>"
     
-    # ===== ЗАМЕТКИ =====
+    # ЗАМЕТКИ
     if notes_text:
         html += f"""
         <h2>📝 Заметки за смену</h2>
@@ -738,22 +666,7 @@ def generate_html_report(notes_text=""):
     </body>
     </html>
     """
-    
     return html
-
-# ===== РАСЧЕТ БОНУСА =====
-def calculate_bonus(total_cash_without_fudi):
-    """Расчет бонуса: 
-       - если >= 1200: +100
-       - потом за каждые 1000 сверху: +100
-    """
-    if total_cash_without_fudi >= 1200:
-        bonus = 100
-        extra = total_cash_without_fudi - 1200
-        if extra >= 1000:
-            bonus += (int(extra // 1000)) * 100
-        return bonus
-    return 0
 
 # ===== ИНТЕРФЕЙС =====
 
@@ -782,7 +695,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Три кнопки в ряд
+# --- ТРИ КНОПКИ В РЯД ---
 col_btn1, col_btn2, col_btn3 = st.columns(3)
 
 with col_btn1:
@@ -808,6 +721,7 @@ with col_btn3:
 
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
+# --- ВКЛАДКИ ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🏠 Главная", "🍣 Фуди", "🧋 Бар", "💻 ПК", "🎮 Игры", "💰 Финансы", "📚 Архив", "📝 Заметки"
 ])
@@ -855,7 +769,6 @@ with tab1:
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
-    # Отчет с заметками
     notes_df = get_notes_today()
     notes_text = ""
     if not notes_df.empty:
@@ -872,19 +785,6 @@ with tab1:
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Кнопка очистки месяца
-    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
-    
-    col_del1, col_del2, col_del3 = st.columns([1, 2, 1])
-    with col_del2:
-        if st.button("🗑️ ОЧИСТИТЬ МЕСЯЦ", use_container_width=True):
-            st.warning("⚠️ ВНИМАНИЕ! Будут удалены ВСЕ данные: все смены, накопления, история!")
-            if st.button("✅ ПОДТВЕРДИТЬ УДАЛЕНИЕ", use_container_width=True):
-                clear_all_data()
-                st.success("✅ Все данные полностью очищены!")
-                st.balloons()
-                st.rerun()
 
 # ===== ФУДИ =====
 with tab2:
@@ -1174,11 +1074,9 @@ with tab6:
         with col2:
             extras = st.number_input("🖨️ Допы (печать и т.д.)", min_value=0.0, step=10.0, format="%.0f")
         
-        # Расчет кассы без Фуди для бонуса
         total_cash_without_fudi = terminal + cash + pc_rent + extras + bar_total
         total_cash = total_cash_without_fudi + fudi_total
         
-        # Расчет ЗП с бонусом
         bonus = calculate_bonus(total_cash_without_fudi)
         salary_today = 400 + bonus
         
@@ -1200,9 +1098,9 @@ with tab6:
             <p>🖥️ Аренда ПК: <b>{pc_rent:.0f} грн</b></p>
             <p>🖨️ Допы: <b>{extras:.0f} грн</b></p>
             <p>💰 Касса без Фуди: <b>{total_cash_without_fudi:.0f} грн</b></p>
-            <p>🎁 Бонус: <b>+{bonus:.0f} грн</b> (за каждые 1000 грн без Фуди)</p>
-            <p>👩‍💼 Заработано за день: <b>{salary_today:.0f} грн</b> (ставка 400 + бонус)</p>
-            <p style="color: #66bb6a;">💸 Забираю сейчас (наличкой): <b>{cash_taken:.0f} грн</b></p>
+            <p>🎁 Бонус: <b>+{bonus:.0f} грн</b></p>
+            <p>👩‍💼 Заработано за день: <b>{salary_today:.0f} грн</b></p>
+            <p style="color: #66bb6a;">💸 Забираю сейчас: <b>{cash_taken:.0f} грн</b></p>
             <p style="color: #ffa726;">🏦 Откладывается к 9 числу: <b>{salary_to_account:.0f} грн</b></p>
             <p style="color: #ef5350;">💰 Инкассация Фуди: <b>-{fudi_inc:.0f} грн</b></p>
             <p style="color: #ffa726;">🐱 Долг Елены: <b>{fudi_debt:.0f} грн</b></p>
@@ -1215,7 +1113,6 @@ with tab6:
                 if salary_to_account > 0:
                     add_salary_accumulation(salary_to_account)
                 
-                # Получаем заметки
                 notes_df = get_notes_today()
                 notes_text = ""
                 if not notes_df.empty:
@@ -1275,7 +1172,6 @@ with tab8:
     st.header("📝 Заметки к отчету")
     st.info("🐱 Пишите заметки в течение смены — они прикрепятся к отчету!")
     
-    # Показать существующие заметки
     notes_df = get_notes_today()
     if not notes_df.empty:
         st.subheader("📋 Заметки за сегодня:")
@@ -1283,7 +1179,6 @@ with tab8:
             st.write(f"**{row['timestamp']}** — {row['note']}")
         st.divider()
     
-    # Добавить заметку
     new_note = st.text_area("✏️ Напишите заметку", placeholder="Например: Приехала Елена, привезла 20 бургеров...")
     if st.button("💾 Сохранить заметку"):
         if new_note.strip():
@@ -1293,7 +1188,6 @@ with tab8:
         else:
             st.warning("Напишите текст заметки")
     
-    # Очистить заметки
     if st.button("🗑️ Очистить все заметки за сегодня"):
         clear_notes()
         st.success("✅ Заметки очищены!")
