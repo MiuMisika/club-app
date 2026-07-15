@@ -684,20 +684,7 @@ st.markdown("""
 
 st.markdown(f"<p style='text-align: right; color: #b39ddb;'>📅 {get_today()}</p>", unsafe_allow_html=True)
 
-total_accumulated = get_salary_accumulation()
-st.markdown(f"""
-<div style="background: linear-gradient(135deg, rgba(247, 141, 167, 0.1), rgba(212, 165, 245, 0.1));
-            border: 2px solid rgba(247, 141, 167, 0.2);
-            border-radius: 20px;
-            padding: 15px 25px;
-            margin-bottom: 20px;
-            text-align: center;">
-    <span style="color: #6b4c6b; font-size: 16px; font-weight: 600;">🐱 НАКОПЛЕНИЯ К 9 ЧИСЛУ:</span>
-    <span style="color: #7e57c2; font-size: 30px; font-weight: 700; margin-left: 15px;">
-        {total_accumulated:.0f} грн
-    </span>
-</div>
-""", unsafe_allow_html=True)
+# --- БЛОК НАКОПЛЕНИЙ УБРАН! ---
 
 # --- ТРИ КНОПКИ В РЯД ---
 col_btn1, col_btn2, col_btn3 = st.columns(3)
@@ -1209,3 +1196,4 @@ with tab8:
         clear_notes()
         st.success("✅ Заметки очищены!")
         st.rerun()
+    
