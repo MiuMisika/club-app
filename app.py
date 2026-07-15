@@ -8,7 +8,6 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
-import plotly.express as px
 
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(
@@ -23,8 +22,6 @@ st.markdown("""
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 50%, #f5f7fa 100%);
     }
-    
-    /* Заголовки */
     h1 {
         background: linear-gradient(90deg, #667eea, #764ba2);
         -webkit-background-clip: text;
@@ -36,18 +33,6 @@ st.markdown("""
         color: #2d3748 !important;
         font-weight: 700 !important;
     }
-    
-    /* Карточки */
-    .css-1r6slb0, .css-1v3fvcr, .stAlert, .stInfo, .stSuccess {
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(10px) !important;
-        border-radius: 20px !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        padding: 20px !important;
-    }
-    
-    /* Кнопки */
     .stButton > button {
         background: linear-gradient(135deg, #667eea, #764ba2) !important;
         color: white !important;
@@ -62,8 +47,6 @@ st.markdown("""
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5) !important;
     }
-    
-    /* Метрики */
     .stMetric {
         background: white !important;
         border-radius: 15px !important;
@@ -71,17 +54,6 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
         border: 1px solid rgba(102, 126, 234, 0.1) !important;
     }
-    .stMetric label {
-        color: #4a5568 !important;
-        font-weight: 600 !important;
-    }
-    .stMetric .stMetricValue {
-        color: #2d3748 !important;
-        font-size: 28px !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background: rgba(255, 255, 255, 0.7);
@@ -94,49 +66,23 @@ st.markdown("""
         padding: 10px 25px;
         color: #4a5568 !important;
         font-weight: 500;
-        transition: all 0.3s ease;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white !important;
     }
-    
-    /* Инпуты */
-    .stNumberInput input, .stTextInput input, .stTextArea textarea {
-        background: white !important;
-        border: 2px solid #e2e8f0 !important;
-        border-radius: 10px !important;
-        color: #2d3748 !important;
-        padding: 10px !important;
-    }
-    .stNumberInput input:focus, .stTextInput input:focus {
-        border-color: #667eea !important;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-    }
-    
-    /* Чекбоксы */
-    .stCheckbox label {
-        color: #2d3748 !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Датафреймы */
     .stDataFrame {
         background: white !important;
         border-radius: 15px !important;
         border: 1px solid #e2e8f0 !important;
         padding: 10px !important;
     }
-    
-    /* Делитель */
     .divider {
         background: linear-gradient(90deg, transparent, #667eea, #764ba2, transparent);
         height: 3px;
         margin: 30px 0;
         border-radius: 10px;
     }
-    
-    /* Кастомные карточки */
     .glass-card {
         background: rgba(255, 255, 255, 0.85);
         backdrop-filter: blur(10px);
@@ -144,12 +90,6 @@ st.markdown("""
         padding: 25px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    .gradient-text {
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -670,7 +610,6 @@ with tab1:
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
-    # PDF
     if st.button("📥 Скачать PDF-отчет за сегодня", use_container_width=True):
         pdf_buffer = generate_pdf_report()
         st.download_button(
@@ -712,14 +651,13 @@ with tab2:
     
     # Инкассация
     st.subheader("💰 Инкассация Фуди")
-    food_inc = st.number_input("Сумма инкассации (забрали из кассы Фуди)", min_value=0.0, step=50.0, format="%.0f")
+    food_inc = st.number_input("Сумма инкассации (забрали из кассы Фуди)", min_value=0.0, step=50.0, format="%.0f", key="food_inc_input")
     if st.button("✅ Сохранить инкассацию"):
         st.session_state['food_incassation'] = food_inc
         st.success(f"Инкассация сохранена: {food_inc:.0f} грн")
     
     st.divider()
     
-    # Остатки
     st.subheader("📦 Остатки на конец дня")
     rem_cols = st.columns(3)
     rem_values = {}
@@ -773,7 +711,6 @@ with tab3:
                 start_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"start_{product}")
         
         if st.button("✅ Сохранить начальные остатки"):
-            # Сохраняем с одинаковыми началом и фактическим
             conn = sqlite3.connect('club_data.db')
             c = conn.cursor()
             today = get_today()
@@ -786,7 +723,6 @@ with tab3:
             st.success("Начальные остатки сохранены!")
             st.rerun()
     else:
-        # Показываем текущие и предлагаем ввести фактические
         st.subheader("Текущие данные")
         st.dataframe(bar_stock_df[['product', 'start_stock', 'sold']].rename(
             columns={'product': 'Товар', 'start_stock': 'Начало', 'sold': 'Продано по учету'}))
@@ -813,7 +749,6 @@ with tab3:
             st.success("Фактические остатки сохранены!")
             st.rerun()
         
-        # Сверка
         st.subheader("🔍 Сверка остатков")
         check_df = bar_stock_df.copy()
         check_df['Расхождение'] = check_df['start_stock'] - check_df['actual_stock']
@@ -893,13 +828,11 @@ with tab6:
         with col2:
             extras = st.number_input("🖨️ Допы (печать и т.д.)", min_value=0.0, step=10.0, format="%.0f")
         
-        # Инкассация из сессии
         food_inc = st.session_state.get('food_incassation', 0)
         st.write(f"💰 Инкассация Фуди: **{food_inc:.0f} грн** (указана во вкладке Фуд-корт)")
         
         total_cash = terminal + cash + pc_rent + extras + food_total + bar_total
         
-        # Расчет ЗП
         if total_cash >= 1200:
             bonus = 100
             if total_cash >= 2000:
@@ -934,7 +867,6 @@ with tab6:
             if total_cash > 0:
                 if salary_to_account > 0:
                     add_salary_accumulation(salary_to_account)
-                
                 save_shift_totals(terminal, cash, pc_rent, extras, food_total, bar_total, food_inc, salary_today, salary_to_account, cash_taken, remaining_cash)
                 st.success(f"✅ Смена закрыта! Заработано: {salary_today:.0f} грн, Забрал: {cash_taken:.0f} грн, Отложено: {salary_to_account:.0f} грн, Остаток: {remaining_cash:.0f} грн")
                 st.balloons()
