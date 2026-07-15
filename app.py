@@ -24,10 +24,6 @@ st.markdown("""
         font-size: 42px !important;
         text-align: center;
     }
-    h2, h3 {
-        color: #2d3748 !important;
-        font-weight: 700 !important;
-    }
     .stButton > button {
         background: linear-gradient(135deg, #667eea, #764ba2) !important;
         color: white !important;
@@ -36,7 +32,6 @@ st.markdown("""
         padding: 12px 30px !important;
         font-weight: 600 !important;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
-        transition: all 0.3s ease !important;
     }
     .stButton > button:hover {
         transform: translateY(-2px) !important;
@@ -47,38 +42,23 @@ st.markdown("""
         border-radius: 15px !important;
         padding: 15px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
-        border: 1px solid rgba(102, 126, 234, 0.1) !important;
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background: rgba(255, 255, 255, 0.7);
         border-radius: 50px;
         padding: 5px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 50px;
-        padding: 10px 25px;
-        color: #4a5568 !important;
-        font-weight: 500;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white !important;
+        border-radius: 50px;
     }
     .divider {
         background: linear-gradient(90deg, transparent, #667eea, #764ba2, transparent);
         height: 3px;
         margin: 30px 0;
         border-radius: 10px;
-    }
-    .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -87,55 +67,85 @@ st.markdown("""
 def init_db():
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS sales_food
+    
+    # Фуди - продажи
+    c.execute('''CREATE TABLE IF NOT EXISTS sales_fudi
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
+    
+    # Фуди - остатки
+    c.execute('''CREATE TABLE IF NOT EXISTS fudi_remaining
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  date TEXT, product TEXT, remaining INTEGER)''')
+    
+    # Фуди - приход товара
+    c.execute('''CREATE TABLE IF NOT EXISTS fudi_arrival
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  date TEXT, product TEXT, quantity INTEGER)''')
+    
+    # Фуди - инкассация
+    c.execute('''CREATE TABLE IF NOT EXISTS fudi_incassation
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  date TEXT, amount REAL)''')
+    
+    # Бар - продажи
     c.execute('''CREATE TABLE IF NOT EXISTS sales_bar
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS food_remaining
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  date TEXT, product TEXT, remaining INTEGER)''')
+    
+    # Бар - остатки
     c.execute('''CREATE TABLE IF NOT EXISTS bar_stock
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, start_stock INTEGER, actual_stock INTEGER, sold INTEGER)''')
+    
+    # Бар - приход товара
+    c.execute('''CREATE TABLE IF NOT EXISTS bar_arrival
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  date TEXT, product TEXT, quantity INTEGER)''')
+    
+    # Бар - список товаров (пользователь может добавлять свои)
+    c.execute('''CREATE TABLE IF NOT EXISTS bar_products
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT UNIQUE, price REAL)''')
+    
+    # ПК
     c.execute('''CREATE TABLE IF NOT EXISTS pc_status
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, pc_number INTEGER, status TEXT, note TEXT)''')
+    
+    # Игры
     c.execute('''CREATE TABLE IF NOT EXISTS games
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   name TEXT UNIQUE, updated BOOLEAN, last_check TEXT)''')
+    
+    # Итоги смены
     c.execute('''CREATE TABLE IF NOT EXISTS shift_totals
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, terminal REAL, cash REAL, pc_rent REAL,
-                  extras REAL, food_total REAL, bar_total REAL,
-                  food_incassation REAL, salary_today REAL, 
-                  salary_to_account REAL, cash_taken REAL, remaining_cash REAL)''')
+                  extras REAL, fudi_total REAL, bar_total REAL,
+                  incassation_total REAL, fudi_debt REAL,
+                  salary_today REAL, salary_to_account REAL, 
+                  cash_taken REAL, remaining_cash REAL)''')
+    
+    # Накопления ЗП
     c.execute('''CREATE TABLE IF NOT EXISTS salary_accumulation
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, amount REAL, total_accumulated REAL)''')
+    
     conn.commit()
     conn.close()
 
 init_db()
 
 # --- СПИСКИ ---
-FOOD_PRODUCTS = {
-    "Бургер": 80, "Картошка фри": 80, "Нагетсы": 80,
-    "Мини-чебуречки": 80, "Хот-дог 2х": 80,
-    "Хот-дог": 75, "Соус": 10
-}
-
-BAR_PRODUCTS = {
-    "Pepsi 0,5л": 25, "Pepsi 0,33л": 20, "Pepsi 0,33л ж/б": 22,
-    "Карпатська жерельна 0,5л": 18, "Battery 0,33л ж/б": 22,
-    "Battery 0,5л ж/б": 25, "Battery 0,5л ж/б с соком": 28,
-    "Ситро 0,5л ж/б": 20, "Дюшес 0,5л ж/б": 20,
-    "Квас Тарас 0,5л ж/б": 22, "Shwepps 0,33": 20,
-    "Coca-Cola/Fanta/Sprite 0,33": 20, "Салфетки обычные": 10,
-    "Флинт 60 г": 30, "Флинт Гренки 55 г": 28,
-    "Hroom 50 г": 32, "Big bob 60 г": 30,
-    "Флинт с Соусом 65 г": 35, "Chipsters чипси 60 г": 28
+FUDI_PRODUCTS = {
+    "Бургер": 80,
+    "Картошка фри": 80,
+    "Нагетсы": 80,
+    "Мини-чебуречки": 80,
+    "Хот-дог 2х": 80,
+    "Хот-дог": 75,
+    "Соус": 10
 }
 
 GAMES_LIST = [
@@ -153,50 +163,97 @@ PC_NUMBERS = list(range(7, 21))
 def get_today():
     return date.today().isoformat()
 
-# ФУДИ
-def add_food_sale(product):
+# ===== ФУДИ =====
+def add_fudi_sale(product):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    price = FOOD_PRODUCTS[product]
-    c.execute("INSERT INTO sales_food (date, product, quantity, price) VALUES (?, ?, ?, ?)",
+    price = FUDI_PRODUCTS[product]
+    c.execute("INSERT INTO sales_fudi (date, product, quantity, price) VALUES (?, ?, ?, ?)",
               (get_today(), product, 1, price))
     conn.commit()
     conn.close()
 
-def get_food_sales_today():
+def get_fudi_sales_today():
     conn = sqlite3.connect('club_data.db')
-    df = pd.read_sql_query(f"SELECT product, SUM(quantity) as total_qty, price FROM sales_food WHERE date='{get_today()}' GROUP BY product", conn)
+    df = pd.read_sql_query(f"SELECT product, SUM(quantity) as total_qty, price FROM sales_fudi WHERE date='{get_today()}' GROUP BY product", conn)
     conn.close()
     return df
 
-def get_food_total_today():
+def get_fudi_total_today():
     conn = sqlite3.connect('club_data.db')
-    df = pd.read_sql_query(f"SELECT SUM(quantity * price) as total FROM sales_food WHERE date='{get_today()}'", conn)
+    df = pd.read_sql_query(f"SELECT SUM(quantity * price) as total FROM sales_fudi WHERE date='{get_today()}'", conn)
     conn.close()
     return df['total'][0] if not df.empty and df['total'][0] else 0
 
-def save_food_remaining(rem_dict):
+def save_fudi_remaining(rem_dict):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     today = get_today()
-    c.execute("DELETE FROM food_remaining WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_remaining WHERE date=?", (today,))
     for product, rem in rem_dict.items():
-        c.execute("INSERT INTO food_remaining (date, product, remaining) VALUES (?, ?, ?)",
+        c.execute("INSERT INTO fudi_remaining (date, product, remaining) VALUES (?, ?, ?)",
                   (today, product, rem))
     conn.commit()
     conn.close()
 
-def get_food_remaining_today():
+def get_fudi_remaining_today():
     conn = sqlite3.connect('club_data.db')
-    df = pd.read_sql_query(f"SELECT product, remaining FROM food_remaining WHERE date='{get_today()}'", conn)
+    df = pd.read_sql_query(f"SELECT product, remaining FROM fudi_remaining WHERE date='{get_today()}'", conn)
     conn.close()
     return df
 
-# БАР
-def add_bar_sale(product):
+def add_fudi_arrival(product, quantity):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    price = BAR_PRODUCTS[product]
+    c.execute("INSERT INTO fudi_arrival (date, product, quantity) VALUES (?, ?, ?)",
+              (get_today(), product, quantity))
+    conn.commit()
+    conn.close()
+
+def get_fudi_arrivals_today():
+    conn = sqlite3.connect('club_data.db')
+    df = pd.read_sql_query(f"SELECT product, SUM(quantity) as total FROM fudi_arrival WHERE date='{get_today()}' GROUP BY product", conn)
+    conn.close()
+    return df
+
+def add_fudi_incassation(amount):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO fudi_incassation (date, amount) VALUES (?, ?)",
+              (get_today(), amount))
+    conn.commit()
+    conn.close()
+
+def get_fudi_incassation_today():
+    conn = sqlite3.connect('club_data.db')
+    df = pd.read_sql_query(f"SELECT SUM(amount) as total FROM fudi_incassation WHERE date='{get_today()}'", conn)
+    conn.close()
+    return df['total'][0] if not df.empty and df['total'][0] else 0
+
+# ===== БАР =====
+def add_bar_product(name, price):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO bar_products (name, price) VALUES (?, ?)", (name, price))
+    conn.commit()
+    conn.close()
+
+def get_bar_products():
+    conn = sqlite3.connect('club_data.db')
+    df = pd.read_sql_query("SELECT name, price FROM bar_products ORDER BY name", conn)
+    conn.close()
+    return df
+
+def delete_bar_product(name):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM bar_products WHERE name=?", (name,))
+    conn.commit()
+    conn.close()
+
+def add_bar_sale(product, price):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
     c.execute("INSERT INTO sales_bar (date, product, quantity, price) VALUES (?, ?, ?, ?)",
               (get_today(), product, 1, price))
     conn.commit()
@@ -214,13 +271,26 @@ def get_bar_total_today():
     conn.close()
     return df['total'][0] if not df.empty and df['total'][0] else 0
 
+def add_bar_arrival(product, quantity):
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO bar_arrival (date, product, quantity) VALUES (?, ?, ?)",
+              (get_today(), product, quantity))
+    conn.commit()
+    conn.close()
+
+def get_bar_arrivals_today():
+    conn = sqlite3.connect('club_data.db')
+    df = pd.read_sql_query(f"SELECT product, SUM(quantity) as total FROM bar_arrival WHERE date='{get_today()}' GROUP BY product", conn)
+    conn.close()
+    return df
+
 def save_bar_stock(start_dict, actual_dict):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     today = get_today()
     c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
-    for product in BAR_PRODUCTS:
-        start = start_dict.get(product, 0)
+    for product, start in start_dict.items():
         actual = actual_dict.get(product, 0)
         sold = start - actual
         c.execute("INSERT INTO bar_stock (date, product, start_stock, actual_stock, sold) VALUES (?, ?, ?, ?, ?)",
@@ -234,7 +304,7 @@ def get_bar_stock_today():
     conn.close()
     return df
 
-# ПК
+# ===== ПК =====
 def save_pc_status(pc_num, status, note):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
@@ -249,7 +319,7 @@ def get_pc_status_today():
     conn.close()
     return df
 
-# ИГРЫ
+# ===== ИГРЫ =====
 def init_games():
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
@@ -273,7 +343,7 @@ def get_games_status():
     conn.close()
     return df
 
-# ЗП
+# ===== ЗП =====
 def get_salary_accumulation():
     conn = sqlite3.connect('club_data.db')
     df = pd.read_sql_query("SELECT SUM(amount) as total FROM salary_accumulation", conn)
@@ -289,12 +359,12 @@ def add_salary_accumulation(amount):
     conn.commit()
     conn.close()
 
-# ИТОГИ
-def save_shift_totals(terminal, cash, pc_rent, extras, food_total, bar_total, food_incassation, salary_today, salary_to_account, cash_taken, remaining_cash):
+# ===== ИТОГИ =====
+def save_shift_totals(terminal, cash, pc_rent, extras, fudi_total, bar_total, incassation_total, fudi_debt, salary_today, salary_to_account, cash_taken, remaining_cash):
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    c.execute("INSERT INTO shift_totals (date, terminal, cash, pc_rent, extras, food_total, bar_total, food_incassation, salary_today, salary_to_account, cash_taken, remaining_cash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              (get_today(), terminal, cash, pc_rent, extras, food_total, bar_total, food_incassation, salary_today, salary_to_account, cash_taken, remaining_cash))
+    c.execute("INSERT INTO shift_totals (date, terminal, cash, pc_rent, extras, fudi_total, bar_total, incassation_total, fudi_debt, salary_today, salary_to_account, cash_taken, remaining_cash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              (get_today(), terminal, cash, pc_rent, extras, fudi_total, bar_total, incassation_total, fudi_debt, salary_today, salary_to_account, cash_taken, remaining_cash))
     conn.commit()
     conn.close()
 
@@ -314,29 +384,35 @@ def clear_day_data():
     today = get_today()
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
-    c.execute("DELETE FROM sales_food WHERE date=?", (today,))
+    c.execute("DELETE FROM sales_fudi WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_remaining WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_arrival WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_incassation WHERE date=?", (today,))
     c.execute("DELETE FROM sales_bar WHERE date=?", (today,))
-    c.execute("DELETE FROM food_remaining WHERE date=?", (today,))
     c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
+    c.execute("DELETE FROM bar_arrival WHERE date=?", (today,))
     c.execute("DELETE FROM pc_status WHERE date=?", (today,))
     c.execute("DELETE FROM shift_totals WHERE date=?", (today,))
     conn.commit()
     conn.close()
 
-# --- ГЕНЕРАЦИЯ HTML ОТЧЕТА ---
+# ===== HTML ОТЧЕТ =====
 def generate_html_report():
     today = get_today()
     
-    food_df = get_food_sales_today()
-    food_total = get_food_total_today()
+    fudi_df = get_fudi_sales_today()
+    fudi_total = get_fudi_total_today()
     bar_df = get_bar_sales_today()
     bar_total = get_bar_total_today()
-    rem_df = get_food_remaining_today()
+    rem_df = get_fudi_remaining_today()
     bar_stock = get_bar_stock_today()
     pc_df = get_pc_status_today()
     games_df = get_games_status()
     shift_df = get_shift_totals_today()
     total_accumulated = get_salary_accumulation()
+    fudi_inc = get_fudi_incassation_today()
+    fudi_arrivals = get_fudi_arrivals_today()
+    bar_arrivals = get_bar_arrivals_today()
     
     html = f"""
     <!DOCTYPE html>
@@ -363,10 +439,6 @@ def generate_html_report():
             .value-orange {{ color: #ed8936; }}
             .value-red {{ color: #e53e3e; }}
             .value-blue {{ color: #667eea; }}
-            .status-ok {{ color: #48bb78; font-weight: 600; }}
-            .status-warning {{ color: #ed8936; font-weight: 600; }}
-            .game-updated {{ color: #48bb78; }}
-            .game-not-updated {{ color: #e53e3e; }}
         </style>
     </head>
     <body>
@@ -375,28 +447,37 @@ def generate_html_report():
             <p style="text-align: center; color: #718096;">Дата: <strong>{today}</strong></p>
     """
     
-    # Фуд-корт
-    html += f"<h2>1. Продажи Фуд-корта</h2>"
-    if not food_df.empty:
+    # ===== ФУДИ =====
+    html += f"<h2>1. Фуди - продажи</h2>"
+    if not fudi_df.empty:
         html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
-        for _, row in food_df.iterrows():
+        for _, row in fudi_df.iterrows():
             html += f"<tr><td>{row['product']}</td><td>{row['total_qty']}</td><td>{row['price']:.0f} грн</td><td>{row['total_qty'] * row['price']:.0f} грн</td></tr>"
-        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{food_total:.0f} грн</td></tr></table>"
+        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{fudi_total:.0f} грн</td></tr></table>"
     else:
         html += "<p style='color: #718096;'>Продаж за сегодня нет</p>"
     
-    # Бар
-    html += f"<h2>2. Продажи Бара</h2>"
-    if not bar_df.empty:
-        html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
-        for _, row in bar_df.iterrows():
-            html += f"<tr><td>{row['product']}</td><td>{row['total_qty']}</td><td>{row['price']:.0f} грн</td><td>{row['total_qty'] * row['price']:.0f} грн</td></tr>"
-        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{bar_total:.0f} грн</td></tr></table>"
+    # Фуди - приход
+    html += f"<h2>Фуди - приход товара</h2>"
+    if not fudi_arrivals.empty:
+        html += """<table><tr><th>Товар</th><th>Количество</th></tr>"""
+        for _, row in fudi_arrivals.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['total']}</td></tr>"
+        html += "</table>"
     else:
-        html += "<p style='color: #718096;'>Продаж за сегодня нет</p>"
+        html += "<p style='color: #718096;'>Прихода за сегодня нет</p>"
     
-    # Остатки Фуди
-    html += f"<h2>3. Остатки Фуд-корта</h2>"
+    # Фуди - инкассация
+    html += f"<h2>Фуди - инкассация</h2>"
+    html += f"<p>Всего инкассировано: <strong>{fudi_inc:.0f} грн</strong></p>"
+    fudi_debt = fudi_total - fudi_inc
+    if fudi_debt > 0:
+        html += f"<p style='color: #ed8936;'>Остаток в кассе Фуди (долг Елены): <strong>{fudi_debt:.0f} грн</strong></p>"
+    else:
+        html += f"<p>Остаток в кассе Фуди: <strong>0 грн</strong></p>"
+    
+    # Фуди - остатки
+    html += f"<h2>Фуди - остатки на конец дня</h2>"
     if not rem_df.empty:
         html += """<table><tr><th>Товар</th><th>Остаток</th></tr>"""
         for _, row in rem_df.iterrows():
@@ -405,23 +486,38 @@ def generate_html_report():
     else:
         html += "<p style='color: #718096;'>Остатки не введены</p>"
     
-    # Остатки Бара
-    html += f"<h2>4. Остатки Бара</h2>"
+    # ===== БАР =====
+    html += f"<h2>2. Бар - продажи</h2>"
+    if not bar_df.empty:
+        html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
+        for _, row in bar_df.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['total_qty']}</td><td>{row['price']:.0f} грн</td><td>{row['total_qty'] * row['price']:.0f} грн</td></tr>"
+        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{bar_total:.0f} грн</td></tr></table>"
+    else:
+        html += "<p style='color: #718096;'>Продаж за сегодня нет</p>"
+    
+    # Бар - приход
+    html += f"<h2>Бар - приход товара</h2>"
+    if not bar_arrivals.empty:
+        html += """<table><tr><th>Товар</th><th>Количество</th></tr>"""
+        for _, row in bar_arrivals.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['total']}</td></tr>"
+        html += "</table>"
+    else:
+        html += "<p style='color: #718096;'>Прихода за сегодня нет</p>"
+    
+    # Бар - остатки
+    html += f"<h2>Бар - остатки</h2>"
     if not bar_stock.empty:
-        html += """<table><tr><th>Товар</th><th>Начало</th><th>Продано</th><th>Остаток</th><th>Статус</th></tr>"""
+        html += """<table><tr><th>Товар</th><th>Начало</th><th>Продано</th><th>Остаток</th></tr>"""
         for _, row in bar_stock.iterrows():
-            sold = row['sold']
-            actual = row['actual_stock']
-            start = row['start_stock']
-            status_class = 'status-ok' if sold == (start - actual) else 'status-warning'
-            status_text = 'Ок' if sold == (start - actual) else 'Расхождение!'
-            html += f"<tr><td>{row['product']}</td><td>{row['start_stock']}</td><td>{sold}</td><td>{actual}</td><td class='{status_class}'>{status_text}</td></tr>"
+            html += f"<tr><td>{row['product']}</td><td>{row['start_stock']}</td><td>{row['sold']}</td><td>{row['actual_stock']}</td></tr>"
         html += "</table>"
     else:
         html += "<p style='color: #718096;'>Остатки бара не введены</p>"
     
-    # ПК
-    html += f"<h2>5. Состояние компьютеров</h2>"
+    # ===== ПК =====
+    html += f"<h2>3. Состояние компьютеров</h2>"
     if not pc_df.empty:
         html += """<table><tr><th>N ПК</th><th>Статус</th><th>Заметка</th></tr>"""
         for _, row in pc_df.iterrows():
@@ -430,32 +526,33 @@ def generate_html_report():
     else:
         html += "<p style='color: #718096;'>Статусы ПК не заполнены</p>"
     
-    # Игры
-    html += f"<h2>6. Обновление игр</h2>"
+    # ===== ИГРЫ =====
+    html += f"<h2>4. Обновление игр</h2>"
     if not games_df.empty:
         html += """<table><tr><th>Игра</th><th>Обновлено</th><th>Дата проверки</th></tr>"""
         for _, row in games_df.iterrows():
             status_text = 'Да' if row['updated'] else 'Нет'
-            status_class = 'game-updated' if row['updated'] else 'game-not-updated'
-            html += f"<tr><td>{row['name']}</td><td class='{status_class}'>{status_text}</td><td>{row['last_check'] or '-'}</td></tr>"
+            color = '#48bb78' if row['updated'] else '#e53e3e'
+            html += f"<tr><td>{row['name']}</td><td style='color:{color};'>{status_text}</td><td>{row['last_check'] or '-'}</td></tr>"
         html += "</table>"
     else:
         html += "<p style='color: #718096;'>Список игр не загружен</p>"
     
-    # Финансы
-    html += f"<h2>7. Финансовый итог смены</h2>"
+    # ===== ФИНАНСЫ =====
+    html += f"<h2>5. Финансовый итог смены</h2>"
     if not shift_df.empty:
         row = shift_df.iloc[0]
-        total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['food_total'] + row['bar_total']
+        total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['fudi_total'] + row['bar_total']
         html += f"""
         <div class="summary">
             <div class="summary-row"><span class="label">Терминал (безнал):</span><span class="value">{row['terminal']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">Наличные:</span><span class="value">{row['cash']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">Аренда ПК:</span><span class="value">{row['pc_rent']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">Допы:</span><span class="value">{row['extras']:.0f} грн</span></div>
-            <div class="summary-row"><span class="label">Фуд-корт:</span><span class="value">{row['food_total']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Фуди:</span><span class="value">{row['fudi_total']:.0f} грн</span></div>
             <div class="summary-row"><span class="label">Бар:</span><span class="value">{row['bar_total']:.0f} грн</span></div>
-            <div class="summary-row"><span class="label">Инкассация Фуди:</span><span class="value value-red">-{row['food_incassation']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Инкассация Фуди:</span><span class="value value-red">-{row['incassation_total']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Долг Елены (остаток в Фуди):</span><span class="value value-orange">{row['fudi_debt']:.0f} грн</span></div>
             <hr style="border: 1px solid #e2e8f0; margin: 15px 0;">
             <div class="summary-row"><span class="label" style="font-size: 18px;">ОБЩАЯ КАССА:</span><span class="value" style="font-size: 18px; color: #667eea;">{total_cash:.0f} грн</span></div>
             <div class="summary-row"><span class="label">Заработано за день:</span><span class="value value-blue">{row['salary_today']:.0f} грн</span></div>
@@ -483,7 +580,7 @@ def generate_html_report():
     
     return html
 
-# --- ИНТЕРФЕЙС ---
+# ===== ИНТЕРФЕЙС =====
 
 st.markdown("""
 <div style="text-align: center; padding: 30px 0 20px 0;">
@@ -520,20 +617,20 @@ with col_new2:
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "Главная", "Фуд-корт", "Бар", "ПК", "Игры", "Финансы", "Архив"
+    "Главная", "Фуди", "Бар", "ПК", "Игры", "Финансы", "Архив"
 ])
 
-# --- ГЛАВНАЯ ---
+# ===== ГЛАВНАЯ =====
 with tab1:
     st.markdown("<h2 style='text-align: center;'>ДАШБОРД СМЕНЫ</h2>", unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Фуд-корт", f"{get_food_total_today():.0f} грн")
+        st.metric("Фуди", f"{get_fudi_total_today():.0f} грн")
     with col2:
         st.metric("Бар", f"{get_bar_total_today():.0f} грн")
     with col3:
-        st.metric("Общая выручка", f"{get_food_total_today() + get_bar_total_today():.0f} грн")
+        st.metric("Общая выручка", f"{get_fudi_total_today() + get_bar_total_today():.0f} грн")
     with col4:
         st.metric("Администратор", "Сегодня")
     
@@ -542,7 +639,7 @@ with tab1:
     shift_df = get_shift_totals_today()
     if not shift_df.empty:
         row = shift_df.iloc[0]
-        total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['food_total'] + row['bar_total']
+        total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['fudi_total'] + row['bar_total']
         
         st.subheader("Итоги смены")
         col5, col6 = st.columns(2)
@@ -551,9 +648,11 @@ with tab1:
             st.write(f"Наличные: **{row['cash']:.0f} грн**")
             st.write(f"Аренда ПК: **{row['pc_rent']:.0f} грн**")
             st.write(f"Допы: **{row['extras']:.0f} грн**")
-            st.write(f"Фуд-корт: **{row['food_total']:.0f} грн**")
+            st.write(f"Фуди: **{row['fudi_total']:.0f} грн**")
         with col6:
             st.write(f"Бар: **{row['bar_total']:.0f} грн**")
+            st.write(f"Инкассация Фуди: **-{row['incassation_total']:.0f} грн**")
+            st.write(f"Долг Елены: **{row['fudi_debt']:.0f} грн**")
             st.write(f"Общая касса: **{total_cash:.0f} грн**")
             st.write(f"Заработано: **{row['salary_today']:.0f} грн**")
             st.write(f"Забрал сейчас: **{row['cash_taken']:.0f} грн**")
@@ -576,147 +675,234 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-# --- ФУД-КОРТ ---
+# ===== ФУДИ =====
 with tab2:
-    st.header("Фуд-корт")
+    st.header("Фуди")
     
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Продажи")
-        for product in FOOD_PRODUCTS:
+        for product in FUDI_PRODUCTS:
             col_a, col_b = st.columns([3, 1])
             with col_a:
-                st.write(f"{product} — {FOOD_PRODUCTS[product]} грн")
+                st.write(f"{product} — {FUDI_PRODUCTS[product]} грн")
             with col_b:
-                if st.button(f"+1", key=f"food_{product}"):
-                    add_food_sale(product)
+                if st.button(f"+1", key=f"fudi_{product}"):
+                    add_fudi_sale(product)
                     st.success(f"{product} добавлен")
                     st.rerun()
     
     with col2:
         st.subheader("Продажи сегодня")
-        df = get_food_sales_today()
+        df = get_fudi_sales_today()
         if not df.empty:
             df['Сумма'] = df['total_qty'] * df['price']
             st.dataframe(df[['product', 'total_qty', 'price', 'Сумма']].rename(
                 columns={'product': 'Товар', 'total_qty': 'Кол-во', 'price': 'Цена'}))
-            st.metric("Общая выручка", f"{get_food_total_today():.0f} грн")
+            st.metric("Общая выручка", f"{get_fudi_total_today():.0f} грн")
         else:
             st.info("Продаж пока нет")
     
     st.divider()
     
-    st.subheader("Инкассация Фуди")
-    food_inc = st.number_input("Сумма инкассации (забрали из кассы Фуди)", min_value=0.0, step=50.0, format="%.0f", key="food_inc_input")
-    if st.button("Сохранить инкассацию"):
-        st.session_state['food_incassation'] = food_inc
-        st.success(f"Инкассация сохранена: {food_inc:.0f} грн")
+    # Приход товара
+    st.subheader("Приход товара (Елена принесла)")
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        product_arrival = st.selectbox("Товар", list(FUDI_PRODUCTS.keys()), key="fudi_arrival_product")
+    with col_b:
+        quantity_arrival = st.number_input("Количество", min_value=1, step=1, key="fudi_arrival_qty")
+    if st.button("Добавить приход"):
+        add_fudi_arrival(product_arrival, quantity_arrival)
+        st.success(f"Приход {product_arrival} x{quantity_arrival} добавлен!")
+        st.rerun()
+    
+    # Показать приходы
+    arrivals_df = get_fudi_arrivals_today()
+    if not arrivals_df.empty:
+        st.write("Приходы сегодня:")
+        st.dataframe(arrivals_df.rename(columns={'product': 'Товар', 'total': 'Количество'}))
     
     st.divider()
     
+    # Инкассация
+    st.subheader("Инкассация (Елена забирает)")
+    incassation_amount = st.number_input("Сумма инкассации", min_value=0.0, step=10.0, format="%.0f", key="fudi_inc")
+    if st.button("Забрать деньги"):
+        if incassation_amount > 0:
+            add_fudi_incassation(incassation_amount)
+            st.success(f"Инкассация {incassation_amount:.0f} грн сохранена!")
+            st.rerun()
+        else:
+            st.warning("Введите сумму больше 0")
+    
+    # Показать инкассацию
+    inc_total = get_fudi_incassation_today()
+    fudi_total = get_fudi_total_today()
+    if inc_total > 0:
+        st.info(f"Всего инкассировано: **{inc_total:.0f} грн**")
+        fudi_debt = fudi_total - inc_total
+        if fudi_debt > 0:
+            st.warning(f"Остаток в кассе Фуди (долг Елены): **{fudi_debt:.0f} грн**")
+        else:
+            st.success("Касса Фуди пуста")
+    
+    st.divider()
+    
+    # Остатки
     st.subheader("Остатки на конец дня")
     rem_cols = st.columns(3)
     rem_values = {}
-    for i, product in enumerate(FOOD_PRODUCTS.keys()):
+    for i, product in enumerate(FUDI_PRODUCTS.keys()):
         with rem_cols[i % 3]:
-            rem_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"rem_{product}")
+            rem_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"fudi_rem_{product}")
     if st.button("Сохранить остатки"):
-        save_food_remaining(rem_values)
+        save_fudi_remaining(rem_values)
         st.success("Остатки сохранены!")
 
-# --- БАР ---
+# ===== БАР =====
 with tab3:
     st.header("Бар")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Продажи")
-        for product in BAR_PRODUCTS:
-            col_a, col_b = st.columns([3, 1])
-            with col_a:
-                st.write(f"{product} — {BAR_PRODUCTS[product]} грн")
-            with col_b:
-                if st.button(f"+1", key=f"bar_{product}"):
-                    add_bar_sale(product)
-                    st.success(f"{product} добавлен")
+    # Управление товарами
+    with st.expander("Управление товарами (добавить/удалить)"):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            new_product = st.text_input("Название товара")
+            new_price = st.number_input("Цена", min_value=0.0, step=1.0, format="%.0f")
+            if st.button("Добавить товар"):
+                if new_product and new_price > 0:
+                    add_bar_product(new_product, new_price)
+                    st.success(f"Товар '{new_product}' добавлен!")
                     st.rerun()
-    
-    with col2:
-        st.subheader("Продажи сегодня")
-        df = get_bar_sales_today()
-        if not df.empty:
-            df['Сумма'] = df['total_qty'] * df['price']
-            st.dataframe(df[['product', 'total_qty', 'price', 'Сумма']].rename(
-                columns={'product': 'Товар', 'total_qty': 'Кол-во', 'price': 'Цена'}))
-            st.metric("Общая выручка", f"{get_bar_total_today():.0f} грн")
-        else:
-            st.info("Продаж пока нет")
+                else:
+                    st.warning("Введите название и цену")
+        
+        with col_b:
+            bar_products_df = get_bar_products()
+            if not bar_products_df.empty:
+                product_to_delete = st.selectbox("Выберите товар для удаления", bar_products_df['name'].tolist())
+                if st.button("Удалить товар"):
+                    delete_bar_product(product_to_delete)
+                    st.success(f"Товар '{product_to_delete}' удален!")
+                    st.rerun()
+            else:
+                st.info("Список товаров пуст")
     
     st.divider()
-    st.subheader("Остатки бара")
-    st.info("Введите начальные остатки (в начале смены) и фактические (в конце смены)")
     
-    bar_stock_df = get_bar_stock_today()
-    
-    if bar_stock_df.empty:
-        st.subheader("Начальные остатки")
-        start_cols = st.columns(3)
-        start_values = {}
-        for i, product in enumerate(BAR_PRODUCTS):
-            with start_cols[i % 3]:
-                start_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"start_{product}")
+    # Продажи
+    bar_products_df = get_bar_products()
+    if not bar_products_df.empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Продажи")
+            for _, row in bar_products_df.iterrows():
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.write(f"{row['name']} — {row['price']:.0f} грн")
+                with col_b:
+                    if st.button(f"+1", key=f"bar_{row['name']}"):
+                        add_bar_sale(row['name'], row['price'])
+                        st.success(f"{row['name']} добавлен")
+                        st.rerun()
         
-        if st.button("Сохранить начальные остатки"):
-            conn = sqlite3.connect('club_data.db')
-            c = conn.cursor()
-            today = get_today()
-            c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
-            for product in BAR_PRODUCTS:
-                c.execute("INSERT INTO bar_stock (date, product, start_stock, actual_stock, sold) VALUES (?, ?, ?, ?, ?)",
-                          (today, product, start_values[product], start_values[product], 0))
-            conn.commit()
-            conn.close()
-            st.success("Начальные остатки сохранены!")
-            st.rerun()
-    else:
-        st.subheader("Текущие данные")
-        st.dataframe(bar_stock_df[['product', 'start_stock', 'sold']].rename(
-            columns={'product': 'Товар', 'start_stock': 'Начало', 'sold': 'Продано по учету'}))
-        
-        st.subheader("Фактические остатки (введите в конце смены)")
-        actual_cols = st.columns(3)
-        actual_values = {}
-        for i, product in enumerate(BAR_PRODUCTS):
-            with actual_cols[i % 3]:
-                default_val = bar_stock_df[bar_stock_df['product'] == product]['actual_stock'].iloc[0] if not bar_stock_df[bar_stock_df['product'] == product].empty else 0
-                actual_values[product] = st.number_input(f"{product}", min_value=0, step=1, value=default_val, key=f"actual_{product}")
-        
-        if st.button("Сохранить фактические остатки"):
-            conn = sqlite3.connect('club_data.db')
-            c = conn.cursor()
-            today = get_today()
-            for product in BAR_PRODUCTS:
-                start = bar_stock_df[bar_stock_df['product'] == product]['start_stock'].iloc[0] if not bar_stock_df[bar_stock_df['product'] == product].empty else 0
-                sold = start - actual_values[product]
-                c.execute("UPDATE bar_stock SET actual_stock=?, sold=? WHERE date=? AND product=?",
-                          (actual_values[product], sold, today, product))
-            conn.commit()
-            conn.close()
-            st.success("Фактические остатки сохранены!")
-            st.rerun()
-        
-        st.subheader("Сверка остатков")
-        check_df = bar_stock_df.copy()
-        check_df['Расхождение'] = check_df['start_stock'] - check_df['actual_stock']
-        for idx, row in check_df.iterrows():
-            if row['Расхождение'] != row['sold']:
-                check_df.loc[idx, 'Статус'] = 'Расхождение!'
+        with col2:
+            st.subheader("Продажи сегодня")
+            df = get_bar_sales_today()
+            if not df.empty:
+                df['Сумма'] = df['total_qty'] * df['price']
+                st.dataframe(df[['product', 'total_qty', 'price', 'Сумма']].rename(
+                    columns={'product': 'Товар', 'total_qty': 'Кол-во', 'price': 'Цена'}))
+                st.metric("Общая выручка", f"{get_bar_total_today():.0f} грн")
             else:
-                check_df.loc[idx, 'Статус'] = 'Ок'
-        st.dataframe(check_df[['product', 'start_stock', 'actual_stock', 'sold', 'Статус']].rename(
-            columns={'product': 'Товар', 'start_stock': 'Начало', 'actual_stock': 'Факт', 'sold': 'Продано'}))
+                st.info("Продаж пока нет")
+        
+        st.divider()
+        
+        # Приход товара в бар
+        st.subheader("Приход товара")
+        bar_arrival_product = st.selectbox("Товар", bar_products_df['name'].tolist(), key="bar_arrival_product")
+        bar_arrival_qty = st.number_input("Количество", min_value=1, step=1, key="bar_arrival_qty")
+        if st.button("Добавить приход в бар"):
+            add_bar_arrival(bar_arrival_product, bar_arrival_qty)
+            st.success(f"Приход {bar_arrival_product} x{bar_arrival_qty} добавлен!")
+            st.rerun()
+        
+        arrivals_bar_df = get_bar_arrivals_today()
+        if not arrivals_bar_df.empty:
+            st.write("Приходы сегодня:")
+            st.dataframe(arrivals_bar_df.rename(columns={'product': 'Товар', 'total': 'Количество'}))
+        
+        st.divider()
+        
+        # Остатки бара
+        st.subheader("Остатки бара")
+        st.info("Введите начальные остатки (в начале смены) и фактические (в конце смены)")
+        
+        bar_stock_df = get_bar_stock_today()
+        
+        if bar_stock_df.empty:
+            st.subheader("Начальные остатки")
+            start_cols = st.columns(3)
+            start_values = {}
+            for i, product in enumerate(bar_products_df['name'].tolist()):
+                with start_cols[i % 3]:
+                    start_values[product] = st.number_input(f"{product}", min_value=0, step=1, key=f"bar_start_{product}")
+            
+            if st.button("Сохранить начальные остатки"):
+                conn = sqlite3.connect('club_data.db')
+                c = conn.cursor()
+                today = get_today()
+                c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
+                for product, start in start_values.items():
+                    c.execute("INSERT INTO bar_stock (date, product, start_stock, actual_stock, sold) VALUES (?, ?, ?, ?, ?)",
+                              (today, product, start, start, 0))
+                conn.commit()
+                conn.close()
+                st.success("Начальные остатки сохранены!")
+                st.rerun()
+        else:
+            st.subheader("Текущие данные")
+            st.dataframe(bar_stock_df[['product', 'start_stock', 'sold']].rename(
+                columns={'product': 'Товар', 'start_stock': 'Начало', 'sold': 'Продано по учету'}))
+            
+            st.subheader("Фактические остатки (введите в конце смены)")
+            actual_cols = st.columns(3)
+            actual_values = {}
+            for i, product in enumerate(bar_products_df['name'].tolist()):
+                with actual_cols[i % 3]:
+                    default_val = bar_stock_df[bar_stock_df['product'] == product]['actual_stock'].iloc[0] if not bar_stock_df[bar_stock_df['product'] == product].empty else 0
+                    actual_values[product] = st.number_input(f"{product}", min_value=0, step=1, value=default_val, key=f"bar_actual_{product}")
+            
+            if st.button("Сохранить фактические остатки"):
+                conn = sqlite3.connect('club_data.db')
+                c = conn.cursor()
+                today = get_today()
+                for product, actual in actual_values.items():
+                    start = bar_stock_df[bar_stock_df['product'] == product]['start_stock'].iloc[0] if not bar_stock_df[bar_stock_df['product'] == product].empty else 0
+                    sold = start - actual
+                    c.execute("UPDATE bar_stock SET actual_stock=?, sold=? WHERE date=? AND product=?",
+                              (actual, sold, today, product))
+                conn.commit()
+                conn.close()
+                st.success("Фактические остатки сохранены!")
+                st.rerun()
+            
+            st.subheader("Сверка остатков")
+            check_df = bar_stock_df.copy()
+            check_df['Расхождение'] = check_df['start_stock'] - check_df['actual_stock']
+            for idx, row in check_df.iterrows():
+                if row['Расхождение'] != row['sold']:
+                    check_df.loc[idx, 'Статус'] = 'Расхождение!'
+                else:
+                    check_df.loc[idx, 'Статус'] = 'Ок'
+            st.dataframe(check_df[['product', 'start_stock', 'actual_stock', 'sold', 'Статус']].rename(
+                columns={'product': 'Товар', 'start_stock': 'Начало', 'actual_stock': 'Факт', 'sold': 'Продано'}))
+    else:
+        st.info("Сначала добавьте товары в разделе 'Управление товарами'")
 
-# --- ПК ---
+# ===== ПК =====
 with tab4:
     st.header("Состояние компьютеров")
     
@@ -745,7 +931,7 @@ with tab4:
         st.dataframe(pc_df[['pc_number', 'status', 'note']].rename(
             columns={'pc_number': 'N ПК', 'status': 'Статус', 'note': 'Заметка'}))
 
-# --- ИГРЫ ---
+# ===== ИГРЫ =====
 with tab5:
     st.header("Обновление игр")
     init_games()
@@ -767,13 +953,15 @@ with tab5:
                         update_game_status(row['name'], updated)
                         st.rerun()
 
-# --- ФИНАНСЫ ---
+# ===== ФИНАНСЫ =====
 with tab6:
     st.header("Финансовый итог смены")
     st.info("Заполните все суммы и нажмите 'Закрыть смену'")
     
-    food_total = get_food_total_today()
+    fudi_total = get_fudi_total_today()
     bar_total = get_bar_total_today()
+    fudi_inc = get_fudi_incassation_today()
+    fudi_debt = fudi_total - fudi_inc
     
     with st.form("shift_close"):
         col1, col2 = st.columns(2)
@@ -784,10 +972,7 @@ with tab6:
         with col2:
             extras = st.number_input("Допы (печать и т.д.)", min_value=0.0, step=10.0, format="%.0f")
         
-        food_inc = st.session_state.get('food_incassation', 0)
-        st.write(f"Инкассация Фуди: **{food_inc:.0f} грн** (указана во вкладке Фуд-корт)")
-        
-        total_cash = terminal + cash + pc_rent + extras + food_total + bar_total
+        total_cash = terminal + cash + pc_rent + extras + fudi_total + bar_total
         
         if total_cash >= 1200:
             bonus = 100
@@ -802,19 +987,20 @@ with tab6:
         if salary_to_account < 0:
             salary_to_account = 0
         
-        remaining_cash = total_cash - salary_today - food_inc
+        remaining_cash = total_cash - salary_today - fudi_inc
         
         st.divider()
         st.markdown(f"""
         <div style="background: rgba(102, 126, 234, 0.1); padding: 20px; border-radius: 15px; border: 1px solid rgba(102, 126, 234, 0.2);">
             <h4>Расчет ЗП</h4>
-            <p>Фуд-корт: <b>{food_total:.0f} грн</b></p>
+            <p>Фуди: <b>{fudi_total:.0f} грн</b></p>
             <p>Бар: <b>{bar_total:.0f} грн</b></p>
+            <p>Инкассация Фуди: <b>-{fudi_inc:.0f} грн</b></p>
+            <p>Долг Елены (остаток в Фуди): <b>{fudi_debt:.0f} грн</b></p>
             <p>Общая касса: <b>{total_cash:.0f} грн</b></p>
             <p>Заработано за день: <b>{salary_today:.0f} грн</b> (ставка 400 + бонус)</p>
             <p style="color: #48bb78;">Забираю сейчас (наличкой): <b>{cash_taken:.0f} грн</b></p>
             <p style="color: #ed8936;">Откладывается к 9 числу: <b>{salary_to_account:.0f} грн</b></p>
-            <p style="color: #e53e3e;">Инкассация Фуди: <b>-{food_inc:.0f} грн</b></p>
             <p>Остаток в кассе: <b>{remaining_cash:.0f} грн</b></p>
         </div>
         """, unsafe_allow_html=True)
@@ -823,31 +1009,32 @@ with tab6:
             if total_cash > 0:
                 if salary_to_account > 0:
                     add_salary_accumulation(salary_to_account)
-                save_shift_totals(terminal, cash, pc_rent, extras, food_total, bar_total, food_inc, salary_today, salary_to_account, cash_taken, remaining_cash)
+                save_shift_totals(terminal, cash, pc_rent, extras, fudi_total, bar_total, fudi_inc, fudi_debt, salary_today, salary_to_account, cash_taken, remaining_cash)
                 st.success(f"Смена закрыта! Заработано: {salary_today:.0f} грн, Забрал: {cash_taken:.0f} грн, Отложено: {salary_to_account:.0f} грн, Остаток: {remaining_cash:.0f} грн")
                 st.balloons()
             else:
                 st.error("Ошибка: общая касса не может быть 0")
 
-# --- АРХИВ ---
+# ===== АРХИВ =====
 with tab7:
     st.header("Архив смен")
     
     all_shifts = get_all_shifts()
     if not all_shifts.empty:
-        all_shifts['Общая касса'] = all_shifts['terminal'] + all_shifts['cash'] + all_shifts['pc_rent'] + all_shifts['extras'] + all_shifts['food_total'] + all_shifts['bar_total']
+        all_shifts['Общая касса'] = all_shifts['terminal'] + all_shifts['cash'] + all_shifts['pc_rent'] + all_shifts['extras'] + all_shifts['fudi_total'] + all_shifts['bar_total']
         all_shifts['Дата'] = all_shifts['date']
         
-        display_cols = ['Дата', 'terminal', 'cash', 'pc_rent', 'extras', 'food_total', 'bar_total', 'food_incassation', 'salary_today', 'cash_taken', 'salary_to_account', 'remaining_cash', 'Общая касса']
+        display_cols = ['Дата', 'terminal', 'cash', 'pc_rent', 'extras', 'fudi_total', 'bar_total', 'incassation_total', 'fudi_debt', 'salary_today', 'cash_taken', 'salary_to_account', 'remaining_cash', 'Общая касса']
         display_names = {
             'Дата': 'Дата',
             'terminal': 'Терминал',
             'cash': 'Наличные',
             'pc_rent': 'Аренда ПК',
             'extras': 'Допы',
-            'food_total': 'Фуд-корт',
+            'fudi_total': 'Фуди',
             'bar_total': 'Бар',
-            'food_incassation': 'Инкассация Фуди',
+            'incassation_total': 'Инкассация Фуди',
+            'fudi_debt': 'Долг Елены',
             'salary_today': 'Заработано',
             'cash_taken': 'Забрал сейчас',
             'salary_to_account': 'Отложено',
