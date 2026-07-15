@@ -444,22 +444,18 @@ def clear_all_data():
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     
-    # Очищаем все таблицы
-    c.execute("DELETE FROM sales_fudi")
-    c.execute("DELETE FROM fudi_remaining")
-    c.execute("DELETE FROM fudi_arrival")
-    c.execute("DELETE FROM fudi_incassation")
-    c.execute("DELETE FROM sales_bar")
-    c.execute("DELETE FROM bar_stock")
-    c.execute("DELETE FROM bar_arrival")
-    c.execute("DELETE FROM bar_products")
-    c.execute("DELETE FROM pc_status")
-    c.execute("DELETE FROM shift_totals")
-    c.execute("DELETE FROM salary_accumulation")
-    c.execute("DELETE FROM games")
-    c.execute("DELETE FROM daily_notes")
+    # Удаляем все данные из таблиц
+    tables = [
+        "sales_fudi", "fudi_remaining", "fudi_arrival", "fudi_incassation",
+        "sales_bar", "bar_stock", "bar_arrival", "bar_products",
+        "pc_status", "shift_totals", "salary_accumulation", 
+        "games", "daily_notes"
+    ]
     
-    # Сбрасываем автоинкремент для всех таблиц
+    for table in tables:
+        c.execute(f"DELETE FROM {table}")
+    
+    # Сбрасываем автоинкремент
     c.execute("DELETE FROM sqlite_sequence")
     
     conn.commit()
