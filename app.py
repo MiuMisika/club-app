@@ -166,47 +166,59 @@ def init_db():
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
     
+    # Фуди - продажи
     c.execute('''CREATE TABLE IF NOT EXISTS sales_fudi
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
     
+    # Фуди - остатки
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_remaining
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, remaining INTEGER)''')
     
+    # Фуди - приход товара
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_arrival
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER)''')
     
+    # Фуди - инкассация
     c.execute('''CREATE TABLE IF NOT EXISTS fudi_incassation
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, amount REAL)''')
     
+    # Бар - продажи
     c.execute('''CREATE TABLE IF NOT EXISTS sales_bar
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER, price REAL)''')
     
+    # Бар - остатки
     c.execute('''CREATE TABLE IF NOT EXISTS bar_stock
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, start_stock INTEGER, actual_stock INTEGER, sold INTEGER)''')
     
+    # Бар - приход товара
     c.execute('''CREATE TABLE IF NOT EXISTS bar_arrival
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, product TEXT, quantity INTEGER)''')
     
+    # Бар - список товаров
     c.execute('''CREATE TABLE IF NOT EXISTS bar_products
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   name TEXT UNIQUE, price REAL)''')
     
+    # ПК
     c.execute('''CREATE TABLE IF NOT EXISTS pc_status
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, pc_number INTEGER, status TEXT, note TEXT)''')
     
+    # Игры
     c.execute('''CREATE TABLE IF NOT EXISTS games
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   name TEXT UNIQUE, updated BOOLEAN, last_check TEXT)''')
     
-    c.execute('''CREATE TABLE IF NOT EXISTS shift_totals
+    # Итоги смены (с колонкой notes)
+    c.execute('''DROP TABLE IF EXISTS shift_totals''')
+    c.execute('''CREATE TABLE shift_totals
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, terminal REAL, cash REAL, pc_rent REAL,
                   extras REAL, fudi_total REAL, bar_total REAL,
@@ -214,51 +226,16 @@ def init_db():
                   salary_today REAL, salary_to_account REAL, 
                   cash_taken REAL, remaining_cash REAL, notes TEXT)''')
     
+    # Накопления ЗП
     c.execute('''CREATE TABLE IF NOT EXISTS salary_accumulation
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, amount REAL, total_accumulated REAL)''')
     
+    # Заметки
     c.execute('''CREATE TABLE IF NOT EXISTS daily_notes
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   date TEXT, note TEXT, timestamp TEXT)''')
     
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# --- СПИСКИ ---
-FUDI_PRODUCTS = {
-    "Бургер": 80,
-    "Картошка фри": 80,
-    "Нагетсы": 80,
-    "Мини-чебуречки": 80,
-    "Хот-дог 2х": 80,
-    "Хот-дог": 75,
-    "Соус": 10
-}
-
-GAMES_LIST = [
-    "League of Legends", "Legends of Runeterra", "Dota 2", "CS2",
-    "Dota Underlords", "Apex Legends", "PUBG: BATTLEGROUNDS",
-    "Arena Breakout: Infinite", "Roblox", "Minecraft",
-    "World of Tanks", "World of Warships", "Hearthstone",
-    "World of Warcraft / WoW Classic", "Fortnite", "War Thunder",
-    "Warcraft III: The Frozen Throne / ICCup Launcher"
-]
-
-PC_NUMBERS = list(range(7, 21))
-
-# --- ФУНКЦИИ ---
-def get_today():
-    return date.today().isoformat()
-
-# ===== ЗАМЕТКИ =====
-def add_note(note):
-    conn = sqlite3.connect('club_data.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO daily_notes (date, note, timestamp) VALUES (?, ?, ?)",
-              (get_today(), note, datetime.now().strftime("%H:%M")))
     conn.commit()
     conn.close()
 
@@ -510,8 +487,11 @@ def clear_day_data():
     conn.close()
 
 def clear_all_data():
+    """Полная очистка всех данных (обнуление месяца)"""
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
+    
+    # Очищаем все таблицы
     c.execute("DELETE FROM sales_fudi")
     c.execute("DELETE FROM fudi_remaining")
     c.execute("DELETE FROM fudi_arrival")
@@ -525,10 +505,31 @@ def clear_all_data():
     c.execute("DELETE FROM salary_accumulation")
     c.execute("DELETE FROM games")
     c.execute("DELETE FROM daily_notes")
+    
+    # Сбрасываем автоинкремент
     c.execute("DELETE FROM sqlite_sequence")
+    
     conn.commit()
     conn.close()
-
+def clear_shift_data():
+    """Очистка только текущей смены (данные за сегодня)"""
+    today = get_today()
+    conn = sqlite3.connect('club_data.db')
+    c = conn.cursor()
+    
+    c.execute("DELETE FROM sales_fudi WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_remaining WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_arrival WHERE date=?", (today,))
+    c.execute("DELETE FROM fudi_incassation WHERE date=?", (today,))
+    c.execute("DELETE FROM sales_bar WHERE date=?", (today,))
+    c.execute("DELETE FROM bar_stock WHERE date=?", (today,))
+    c.execute("DELETE FROM bar_arrival WHERE date=?", (today,))
+    c.execute("DELETE FROM pc_status WHERE date=?", (today,))
+    c.execute("DELETE FROM shift_totals WHERE date=?", (today,))
+    c.execute("DELETE FROM daily_notes WHERE date=?", (today,))
+    
+    conn.commit()
+    conn.close()
 # ===== HTML ОТЧЕТ =====
 def generate_html_report(notes_text=""):
     today = get_today()
@@ -781,12 +782,29 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-col_new1, col_new2, col_new3 = st.columns([1, 2, 1])
-with col_new2:
+# Три кнопки в ряд
+col_btn1, col_btn2, col_btn3 = st.columns(3)
+
+with col_btn1:
     if st.button("🔄 НОВАЯ СМЕНА", use_container_width=True):
-        clear_day_data()
-        st.success("✨ Данные за сегодня очищены! Можно начинать новую смену.")
+        clear_shift_data()
+        st.success("✅ Данные за сегодня очищены! Можно начинать новую смену.")
         st.rerun()
+
+with col_btn2:
+    if st.button("🗑️ ОЧИСТИТЬ СМЕНУ", use_container_width=True):
+        clear_shift_data()
+        st.success("✅ Текущая смена очищена!")
+        st.rerun()
+
+with col_btn3:
+    if st.button("📦 ОЧИСТИТЬ МЕСЯЦ", use_container_width=True):
+        st.warning("⚠️ ВНИМАНИЕ! Будут удалены ВСЕ данные!")
+        if st.button("✅ ПОДТВЕРДИТЬ УДАЛЕНИЕ", use_container_width=True):
+            clear_all_data()
+            st.success("✅ Все данные полностью очищены!")
+            st.balloons()
+            st.rerun()
 
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
