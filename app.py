@@ -440,9 +440,11 @@ def clear_shift_data():
     conn.close()
 
 def clear_all_data():
-    """Полная очистка всех данных"""
+    """Полная очистка всех данных (обнуление месяца)"""
     conn = sqlite3.connect('club_data.db')
     c = conn.cursor()
+    
+    # Очищаем все таблицы
     c.execute("DELETE FROM sales_fudi")
     c.execute("DELETE FROM fudi_remaining")
     c.execute("DELETE FROM fudi_arrival")
@@ -456,10 +458,12 @@ def clear_all_data():
     c.execute("DELETE FROM salary_accumulation")
     c.execute("DELETE FROM games")
     c.execute("DELETE FROM daily_notes")
+    
+    # Сбрасываем автоинкремент для всех таблиц
     c.execute("DELETE FROM sqlite_sequence")
+    
     conn.commit()
     conn.close()
-
 # ===== РАСЧЕТ БОНУСА =====
 def calculate_bonus(total_cash_without_fudi):
     """Расчет бонуса: если >= 1200 +100, потом за каждые 1000 +100"""
