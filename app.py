@@ -2,16 +2,6 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime, date
-import io
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import os
-import requests
 
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(
@@ -20,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- КАСТОМНЫЙ CSS (СВЕТЛЫЙ ДИЗАЙН) ---
+# --- CSS ---
 st.markdown("""
 <style>
     .stApp {
@@ -32,6 +22,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         font-weight: 800 !important;
         font-size: 42px !important;
+        text-align: center;
     }
     h2, h3 {
         color: #2d3748 !important;
@@ -44,8 +35,8 @@ st.markdown("""
         border-radius: 50px !important;
         padding: 12px 30px !important;
         font-weight: 600 !important;
-        transition: all 0.3s ease !important;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+        transition: all 0.3s ease !important;
     }
     .stButton > button:hover {
         transform: translateY(-2px) !important;
@@ -80,6 +71,14 @@ st.markdown("""
         height: 3px;
         margin: 30px 0;
         border-radius: 10px;
+    }
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -150,7 +149,7 @@ GAMES_LIST = [
 
 PC_NUMBERS = list(range(7, 21))
 
-# --- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ---
+# --- ФУНКЦИИ ---
 def get_today():
     return date.today().isoformat()
 
@@ -324,268 +323,172 @@ def clear_day_data():
     conn.commit()
     conn.close()
 
-# --- PDF (РАБОЧАЯ ВЕРСИЯ С КИРИЛЛИЦЕЙ) ---
-def download_font():
-    """Скачиваем шрифт с поддержкой кириллицы"""
-    font_url = "https://github.com/ArtemkaKun/PDF-Report/raw/main/fonts/DejaVuSans.ttf"
-    font_path = "DejaVuSans.ttf"
-    
-    if not os.path.exists(font_path):
-        try:
-            response = requests.get(font_url)
-            with open(font_path, "wb") as f:
-                f.write(response.content)
-        except:
-            pass
-    return font_path
-
-def generate_pdf_report():
+# --- ГЕНЕРАЦИЯ HTML ОТЧЕТА ---
+def generate_html_report():
     today = get_today()
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-    styles = getSampleStyleSheet()
     
-    # Пытаемся загрузить шрифт с кириллицей
-    font_name = 'Helvetica'
-    try:
-        font_path = download_font()
-        if os.path.exists(font_path):
-            pdfmetrics.registerFont(TTFont('DejaVu', font_path))
-            font_name = 'DejaVu'
-    except:
-        pass
-    
-    # Стили
-    style_title = ParagraphStyle(
-        'CustomTitle', 
-        parent=styles['Heading1'], 
-        fontSize=18, 
-        alignment=TA_CENTER, 
-        spaceAfter=20, 
-        textColor=colors.HexColor('#667eea'),
-        fontName=font_name
-    )
-    style_header = ParagraphStyle(
-        'CustomHeader', 
-        parent=styles['Heading2'], 
-        fontSize=14, 
-        spaceAfter=10, 
-        textColor=colors.HexColor('#764ba2'),
-        fontName=font_name
-    )
-    style_normal = ParagraphStyle(
-        'CustomNormal', 
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=10
-    )
-    
-    elements = []
-    elements.append(Paragraph(f"Отчет по смене от {today}", style_title))
-    elements.append(Spacer(1, 10))
-    
-    # 1. Фуди
-    elements.append(Paragraph("1. Продажи Фуд-корта", style_header))
     food_df = get_food_sales_today()
-    if not food_df.empty:
-        food_data = [["Товар", "Кол-во", "Цена", "Сумма"]]
-        for _, row in food_df.iterrows():
-            food_data.append([
-                row['product'], 
-                str(row['total_qty']), 
-                f"{row['price']:.0f} грн", 
-                f"{row['total_qty'] * row['price']:.0f} грн"
-            ])
-        food_data.append(["", "", "ИТОГО:", f"{get_food_total_today():.0f} грн"])
-        table = Table(food_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Продаж за сегодня нет", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 2. Бар
-    elements.append(Paragraph("2. Продажи Бара", style_header))
+    food_total = get_food_total_today()
     bar_df = get_bar_sales_today()
-    if not bar_df.empty:
-        bar_data = [["Товар", "Кол-во", "Цена", "Сумма"]]
-        for _, row in bar_df.iterrows():
-            bar_data.append([
-                row['product'], 
-                str(row['total_qty']), 
-                f"{row['price']:.0f} грн", 
-                f"{row['total_qty'] * row['price']:.0f} грн"
-            ])
-        bar_data.append(["", "", "ИТОГО:", f"{get_bar_total_today():.0f} грн"])
-        table = Table(bar_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Продаж за сегодня нет", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 3. Остатки Фуди
-    elements.append(Paragraph("3. Остатки Фуд-корта", style_header))
+    bar_total = get_bar_total_today()
     rem_df = get_food_remaining_today()
-    if not rem_df.empty:
-        rem_data = [["Товар", "Остаток"]]
-        for _, row in rem_df.iterrows():
-            rem_data.append([row['product'], str(row['remaining'])])
-        table = Table(rem_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Остатки не введены", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 4. Остатки Бара
-    elements.append(Paragraph("4. Остатки Бара", style_header))
     bar_stock = get_bar_stock_today()
-    if not bar_stock.empty:
-        stock_data = [["Товар", "Начало", "Продано", "Остаток"]]
-        for _, row in bar_stock.iterrows():
-            stock_data.append([
-                row['product'], 
-                str(row['start_stock']), 
-                str(row['sold']), 
-                str(row['actual_stock'])
-            ])
-        table = Table(stock_data, colWidths=[80, 45, 45, 45])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Остатки бара не введены", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 5. ПК
-    elements.append(Paragraph("5. Состояние компьютеров", style_header))
     pc_df = get_pc_status_today()
-    if not pc_df.empty:
-        pc_data = [["N ПК", "Статус", "Заметка"]]
-        for _, row in pc_df.iterrows():
-            pc_data.append([str(row['pc_number']), row['status'], row['note'] or "-"])
-        table = Table(pc_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Статусы ПК не заполнены", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 6. Игры
-    elements.append(Paragraph("6. Обновление игр", style_header))
     games_df = get_games_status()
-    if not games_df.empty:
-        games_data = [["Игра", "Обновлено", "Дата проверки"]]
-        for _, row in games_df.iterrows():
-            status = "Да" if row['updated'] else "Нет"
-            games_data.append([row['name'], status, row['last_check'] or "-"])
-        table = Table(games_data, colWidths=[120, 50, 80])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("Список игр не загружен", style_normal))
-    elements.append(Spacer(1, 10))
-    
-    # 7. Финансы
-    elements.append(Paragraph("7. Финансовый итог смены", style_header))
     shift_df = get_shift_totals_today()
+    total_accumulated = get_salary_accumulation()
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Отчет по смене от {today}</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 40px; background: #f5f7fa; color: #2d3748; }}
+            .container {{ max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }}
+            h1 {{ text-align: center; color: #667eea; font-size: 28px; border-bottom: 3px solid #667eea; padding-bottom: 15px; }}
+            h2 {{ color: #764ba2; font-size: 20px; margin-top: 30px; border-left: 4px solid #764ba2; padding-left: 15px; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }}
+            th {{ background: #667eea; color: white; padding: 10px; text-align: center; }}
+            td {{ padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center; }}
+            tr:hover {{ background: #f7fafc; }}
+            .total-row {{ background: #edf2f7; font-weight: bold; }}
+            .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e2e8f0; color: #718096; font-size: 14px; }}
+            .summary {{ background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 10px; padding: 20px; margin: 20px 0; }}
+            .summary-row {{ display: flex; justify-content: space-between; padding: 5px 0; }}
+            .label {{ font-weight: 600; color: #4a5568; }}
+            .value {{ font-weight: 700; color: #2d3748; }}
+            .value-green {{ color: #48bb78; }}
+            .value-orange {{ color: #ed8936; }}
+            .value-red {{ color: #e53e3e; }}
+            .value-blue {{ color: #667eea; }}
+            .status-ok {{ color: #48bb78; font-weight: 600; }}
+            .status-warning {{ color: #ed8936; font-weight: 600; }}
+            .game-updated {{ color: #48bb78; }}
+            .game-not-updated {{ color: #e53e3e; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Отчет по смене</h1>
+            <p style="text-align: center; color: #718096;">Дата: <strong>{today}</strong></p>
+    """
+    
+    # Фуд-корт
+    html += f"<h2>1. Продажи Фуд-корта</h2>"
+    if not food_df.empty:
+        html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
+        for _, row in food_df.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['total_qty']}</td><td>{row['price']:.0f} грн</td><td>{row['total_qty'] * row['price']:.0f} грн</td></tr>"
+        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{food_total:.0f} грн</td></tr></table>"
+    else:
+        html += "<p style='color: #718096;'>Продаж за сегодня нет</p>"
+    
+    # Бар
+    html += f"<h2>2. Продажи Бара</h2>"
+    if not bar_df.empty:
+        html += """<table><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr>"""
+        for _, row in bar_df.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['total_qty']}</td><td>{row['price']:.0f} грн</td><td>{row['total_qty'] * row['price']:.0f} грн</td></tr>"
+        html += f"<tr class='total-row'><td colspan='2'></td><td>ИТОГО:</td><td>{bar_total:.0f} грн</td></tr></table>"
+    else:
+        html += "<p style='color: #718096;'>Продаж за сегодня нет</p>"
+    
+    # Остатки Фуди
+    html += f"<h2>3. Остатки Фуд-корта</h2>"
+    if not rem_df.empty:
+        html += """<table><tr><th>Товар</th><th>Остаток</th></tr>"""
+        for _, row in rem_df.iterrows():
+            html += f"<tr><td>{row['product']}</td><td>{row['remaining']}</td></tr>"
+        html += "</table>"
+    else:
+        html += "<p style='color: #718096;'>Остатки не введены</p>"
+    
+    # Остатки Бара
+    html += f"<h2>4. Остатки Бара</h2>"
+    if not bar_stock.empty:
+        html += """<table><tr><th>Товар</th><th>Начало</th><th>Продано</th><th>Остаток</th><th>Статус</th></tr>"""
+        for _, row in bar_stock.iterrows():
+            sold = row['sold']
+            actual = row['actual_stock']
+            start = row['start_stock']
+            status_class = 'status-ok' if sold == (start - actual) else 'status-warning'
+            status_text = 'Ок' if sold == (start - actual) else 'Расхождение!'
+            html += f"<tr><td>{row['product']}</td><td>{row['start_stock']}</td><td>{sold}</td><td>{actual}</td><td class='{status_class}'>{status_text}</td></tr>"
+        html += "</table>"
+    else:
+        html += "<p style='color: #718096;'>Остатки бара не введены</p>"
+    
+    # ПК
+    html += f"<h2>5. Состояние компьютеров</h2>"
+    if not pc_df.empty:
+        html += """<table><tr><th>N ПК</th><th>Статус</th><th>Заметка</th></tr>"""
+        for _, row in pc_df.iterrows():
+            html += f"<tr><td>{row['pc_number']}</td><td>{row['status']}</td><td>{row['note'] or '-'}</td></tr>"
+        html += "</table>"
+    else:
+        html += "<p style='color: #718096;'>Статусы ПК не заполнены</p>"
+    
+    # Игры
+    html += f"<h2>6. Обновление игр</h2>"
+    if not games_df.empty:
+        html += """<table><tr><th>Игра</th><th>Обновлено</th><th>Дата проверки</th></tr>"""
+        for _, row in games_df.iterrows():
+            status_text = 'Да' if row['updated'] else 'Нет'
+            status_class = 'game-updated' if row['updated'] else 'game-not-updated'
+            html += f"<tr><td>{row['name']}</td><td class='{status_class}'>{status_text}</td><td>{row['last_check'] or '-'}</td></tr>"
+        html += "</table>"
+    else:
+        html += "<p style='color: #718096;'>Список игр не загружен</p>"
+    
+    # Финансы
+    html += f"<h2>7. Финансовый итог смены</h2>"
     if not shift_df.empty:
         row = shift_df.iloc[0]
         total_cash = row['terminal'] + row['cash'] + row['pc_rent'] + row['extras'] + row['food_total'] + row['bar_total']
-        fin_data = [
-            ["Статья", "Сумма (грн)"],
-            ["Терминал (безнал)", f"{row['terminal']:.0f}"],
-            ["Наличные", f"{row['cash']:.0f}"],
-            ["Аренда ПК", f"{row['pc_rent']:.0f}"],
-            ["Допы", f"{row['extras']:.0f}"],
-            ["Фуд-корт", f"{row['food_total']:.0f}"],
-            ["Бар", f"{row['bar_total']:.0f}"],
-            ["Инкассация Фуди", f"-{row['food_incassation']:.0f}"],
-            ["", ""],
-            ["ОБЩАЯ КАССА", f"{total_cash:.0f}"],
-            ["Заработано за день", f"{row['salary_today']:.0f}"],
-            ["Забрал сейчас", f"{row['cash_taken']:.0f}"],
-            ["Отложено к 9 числу", f"{row['salary_to_account']:.0f}"],
-            ["", ""],
-            ["ИТОГОВЫЙ ОСТАТОК", f"{row['remaining_cash']:.0f}"]
-        ]
-        table = Table(fin_data, colWidths=[150, 100])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (-2, -2), (-1, -1), colors.HexColor('#48bb78')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(table)
-        total_accumulated = get_salary_accumulation()
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph(f"Накопления к 9 числу: {total_accumulated:.0f} грн", style_header))
+        html += f"""
+        <div class="summary">
+            <div class="summary-row"><span class="label">Терминал (безнал):</span><span class="value">{row['terminal']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Наличные:</span><span class="value">{row['cash']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Аренда ПК:</span><span class="value">{row['pc_rent']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Допы:</span><span class="value">{row['extras']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Фуд-корт:</span><span class="value">{row['food_total']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Бар:</span><span class="value">{row['bar_total']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Инкассация Фуди:</span><span class="value value-red">-{row['food_incassation']:.0f} грн</span></div>
+            <hr style="border: 1px solid #e2e8f0; margin: 15px 0;">
+            <div class="summary-row"><span class="label" style="font-size: 18px;">ОБЩАЯ КАССА:</span><span class="value" style="font-size: 18px; color: #667eea;">{total_cash:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Заработано за день:</span><span class="value value-blue">{row['salary_today']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Забрал сейчас (наличкой):</span><span class="value value-green">{row['cash_taken']:.0f} грн</span></div>
+            <div class="summary-row"><span class="label">Отложено к 9 числу:</span><span class="value value-orange">{row['salary_to_account']:.0f} грн</span></div>
+            <hr style="border: 1px solid #e2e8f0; margin: 15px 0;">
+            <div class="summary-row"><span class="label" style="font-size: 18px;">ИТОГОВЫЙ ОСТАТОК:</span><span class="value" style="font-size: 18px; color: #48bb78;">{row['remaining_cash']:.0f} грн</span></div>
+        </div>
+        """
+        html += f"""
+        <div style="text-align: center; background: #f0f4ff; padding: 15px; border-radius: 10px; margin-top: 15px;">
+            <span style="font-weight: 600;">Накопления к 9 числу:</span>
+            <span style="font-size: 24px; font-weight: 700; color: #667eea;">{total_accumulated:.0f} грн</span>
+        </div>
+        """
     else:
-        elements.append(Paragraph("Финансовый итог не подведен", style_normal))
+        html += "<p style='color: #718096;'>Финансовый итог не подведен</p>"
     
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+    html += f"""
+            <div class="footer">Отчет сгенерирован автоматически • {today}</div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html
 
 # --- ИНТЕРФЕЙС ---
+
 st.markdown("""
 <div style="text-align: center; padding: 30px 0 20px 0;">
     <h1>КОМПЬЮТЕРНЫЙ КЛУБ</h1>
-    <p style="color: #4a5568; font-size: 18px; letter-spacing: 3px; margin-top: 5px;">
-        УПРАВЛЕНИЕ СМЕНОЙ • ДАШБОРД
-    </p>
+    <p style="color: #4a5568; font-size: 18px; letter-spacing: 3px;">УПРАВЛЕНИЕ СМЕНОЙ</p>
     <div class="divider"></div>
 </div>
 """, unsafe_allow_html=True)
@@ -661,14 +564,17 @@ with tab1:
     
     st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
     
-    if st.button("Скачать PDF-отчет за сегодня", use_container_width=True):
-        pdf_buffer = generate_pdf_report()
-        st.download_button(
-            label="Сохранить PDF",
-            data=pdf_buffer,
-            file_name=f"otchet_{get_today()}.pdf",
-            mime="application/pdf"
-        )
+    if st.button("Открыть отчет в браузере", use_container_width=True):
+        html_report = generate_html_report()
+        st.markdown(f"""
+        <div style="text-align: center; padding: 20px; background: #ebf8ff; border-radius: 15px; border: 2px solid #667eea;">
+            <p style="font-size: 18px;">Отчет готов!</p>
+            <p style="color: #718096;">Нажмите <strong>Ctrl+P</strong> (или Cmd+P на Mac) и выберите <strong>"Сохранить как PDF"</strong></p>
+            <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-top: 15px; background: white; text-align: left; max-height: 500px; overflow: auto;">
+                {html_report}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- ФУД-КОРТ ---
 with tab2:
@@ -952,7 +858,6 @@ with tab7:
         st.dataframe(all_shifts[display_cols].rename(columns=display_names))
         
         total_all = all_shifts['Общая касса'].sum()
-        total_salary = all_shifts['salary_to_account'].sum()
         total_accum = get_salary_accumulation()
         
         col1, col2, col3 = st.columns(3)
